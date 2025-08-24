@@ -1,0 +1,76 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net9.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<PublishAot>true</PublishAot>
+		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+		<IsAotCompatible>true</IsAotCompatible>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<Platforms>x64;x86;ARM64</Platforms>
+
+		<!-- this is needed to generate a .runtimeconfig.json file -->
+		<EnableDynamicLoading>true</EnableDynamicLoading>
+
+		<!-- https://github.com/dotnet/runtime/blob/main/docs/workflow/trimming/feature-switches.md -->
+		<!-- this is needed for the .NET dll (not AOT published) to be loaded by the native thunk dll -->
+		<!-- specifying this with RuntimeHostConfigurationOption doesn't seem to work -->
+		<_EnableConsumingManagedCodeFromNativeHosting>true</_EnableConsumingManagedCodeFromNativeHosting>
+
+		<!-- this is needed for AOT trimming to keep ProgId attributes -->
+		<!-- https://github.com/dotnet/runtime/blob/main/src/libraries/System.Private.CoreLib/src/ILLink/ILLink.LinkAttributes.Shared.xml -->
+		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <Compile Include="..\ActiveN\Properties\AssemblyVersionInfo.cs" Link="Properties\AssemblyVersionInfo.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\ActiveN\ActiveN.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Reference Include="DirectN">
+			<HintPath>..\ActiveN\External\DirectN.dll</HintPath>
+		</Reference>
+		<Reference Include="DirectN.Extensions">
+			<HintPath>..\ActiveN\External\DirectN.Extensions.dll</HintPath>
+		</Reference>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Hosting\" />
+	</ItemGroup>
+
+	<Target Name="AotNetComHost" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">
+		<ItemGroup>
+			<AotNetComHost Include="$(ProjectDir)..\ActiveN\External\AotNetComHost.$(Platform).dll" />
+		</ItemGroup>
+		<Copy SourceFiles="@(AotNetComHost)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+		<Move ContinueOnError="false" SourceFiles="$(OutDir)AotNetComHost.$(Platform).dll" DestinationFiles="$(OutDir)$(AssemblyName).comthunk.dll" />
+	</Target>
+
+	<ItemGroup>
+		<Using Include="ActiveN" />
+		<Using Include="ActiveN.Hosting" />
+		<Using Include="DirectN" />
+		<Using Include="DirectN.Extensions" />
+		<Using Include="DirectN.Extensions.Com" />
+		<Using Include="DirectN.Extensions.Utilities" />
+		<Using Include="Microsoft.Win32" />
+		<Using Include="System" />
+		<Using Include="System.ComponentModel" />
+		<Using Include="System.Diagnostics" />
+		<Using Include="System.Diagnostics.CodeAnalysis" />
+		<Using Include="System.IO" />
+		<Using Include="System.Linq" />
+		<Using Include="System.Reflection" />
+		<Using Include="System.Runtime.CompilerServices" />
+		<Using Include="System.Runtime.InteropServices" />
+		<Using Include="System.Runtime.InteropServices.Marshalling" />
+		<Using Include="System.Runtime.Versioning" />
+		<Using Include="System.Security" />
+	</ItemGroup>
+
+</Project>
