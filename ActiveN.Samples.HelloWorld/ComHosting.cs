@@ -12,6 +12,8 @@ public class ComHosting : ComRegistration
     {
     }
 
+    public override bool InstallInHkcu { get => true; }
+
     // these are the standard COM DLL exports that *must* be declared
 
     // create registry entries for all types supported in this module.

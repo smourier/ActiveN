@@ -32,6 +32,7 @@
 		<Using Include="System.Runtime.InteropServices.Marshalling" />
 		<Using Include="System.Runtime.Versioning" />
 		<Using Include="System.Security" />
+		<Using Include="System.Threading" />
 	</ItemGroup>
 
 	<ItemGroup>

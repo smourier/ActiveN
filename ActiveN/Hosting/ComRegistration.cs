@@ -80,11 +80,31 @@ public abstract partial class ComRegistration
     protected virtual ComRegistrationContext CreateRegistrationContext(RegistryKey root, ComRegistrationType type) => new(this, root, type);
     protected virtual ClassFactory CreateClassFactory(Guid clsid) => new(clsid, this);
 
-    protected static uint WrapErrors(Func<HRESULT> action)
+    public static uint WrapErrors(Func<HRESULT> action)
     {
         try
         {
             return (uint)action();
+        }
+        catch (SecurityException se)
+        {
+            // transform this one as a well-known access denied
+            Trace($"Ex:{se}");
+            return (uint)Constants.E_ACCESSDENIED;
+        }
+        catch (Exception ex)
+        {
+            Trace($"Ex:{ex}");
+            return (uint)ex.HResult;
+        }
+    }
+
+    public static uint WrapErrors(Action action)
+    {
+        try
+        {
+            action();
+            return 0;
         }
         catch (SecurityException se)
         {
