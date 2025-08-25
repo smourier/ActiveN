@@ -1,7 +1,13 @@
 ﻿namespace ActiveN.Hosting;
 
-public class ComRegistrationContext(BaseComRegistration registration, RegistryKey registryRoot)
+public class ComRegistrationContext(
+    ComRegistration registration,
+    RegistryKey registryRoot,
+    ComRegistrationType type)
 {
-    public BaseComRegistration Registration { get; } = registration;
+    public ComRegistration Registration { get; } = registration;
     public RegistryKey RegistryRoot { get; } = registryRoot;
+    public ComRegistrationType Type { get; } = type;
+
+    public virtual Guid GUID { get; set; } = type.Type.GUID;
 }

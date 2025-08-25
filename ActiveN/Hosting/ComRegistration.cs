@@ -1,11 +1,12 @@
 ﻿namespace ActiveN.Hosting;
 
-public abstract partial class BaseComRegistration
+public abstract partial class ComRegistration
 {
     private readonly Lazy<string> _dllPath;
+    private readonly ConcurrentDictionary<Guid, ClassFactory> _classFactories = new();
 
     [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "Will mostly work in debug only")]
-    protected BaseComRegistration(IReadOnlyList<ComRegistrationType> comTypes)
+    protected ComRegistration(IReadOnlyList<ComRegistrationType> comTypes)
     {
         ArgumentNullException.ThrowIfNull(comTypes);
         ComTypes = comTypes;
@@ -37,6 +38,7 @@ public abstract partial class BaseComRegistration
     }
 
     public IReadOnlyList<ComRegistrationType> ComTypes { get; }
+    public IDictionary<Guid, ClassFactory> ClassFactories => _classFactories;
     public string DllPath => _dllPath.Value;
     public virtual bool InstallInHkcu { get; protected set; } = false;
     public virtual string? ThreadingModel { get; protected set; } // default is Both
@@ -51,7 +53,32 @@ public abstract partial class BaseComRegistration
     }
 #endif
 
-    protected virtual ComRegistrationContext CreateRegistrationContext(RegistryKey root) => new(this, root);
+    protected virtual internal HRESULT CreateInstance(ClassFactory classFactory, nint pUnkOuter, in Guid riid, out object? instance)
+    {
+        ArgumentNullException.ThrowIfNull(classFactory);
+        instance = null;
+        if (pUnkOuter != 0)
+            return Constants.CLASS_E_NOAGGREGATION;
+
+        foreach (var comType in ComTypes)
+        {
+            if (classFactory.Clsid == comType.Type.GUID)
+            {
+                var ctor = comType.Type.GetConstructor(Type.EmptyTypes);
+                if (ctor != null)
+                {
+                    instance = ctor.Invoke(null);
+                    return Constants.S_OK;
+                }
+            }
+        }
+
+        return Constants.E_NOINTERFACE;
+    }
+
+
+    protected virtual ComRegistrationContext CreateRegistrationContext(RegistryKey root, ComRegistrationType type) => new(this, root, type);
+    protected virtual ClassFactory CreateClassFactory(Guid clsid) => new(clsid, this);
 
     protected static uint WrapErrors(Func<HRESULT> action)
     {
@@ -91,7 +118,7 @@ public abstract partial class BaseComRegistration
         RegisterInProcessComObject(registryRoot, type.Type, RegistrationDllPath, ThreadingModel);
 
         var method = type.Type.GetMethod(nameof(RegisterType), BindingFlags.Public | BindingFlags.Static);
-        method?.Invoke(null, [CreateRegistrationContext(registryRoot) ?? throw new InvalidOperationException()]);
+        method?.Invoke(null, [CreateRegistrationContext(registryRoot, type) ?? throw new InvalidOperationException()]);
     }
 
     protected virtual HRESULT UnregisterServer()
@@ -112,10 +139,10 @@ public abstract partial class BaseComRegistration
         UnregisterComObject(registryRoot, type.Type);
 
         var method = type.Type.GetMethod(nameof(UnregisterType), BindingFlags.Public | BindingFlags.Static);
-        method?.Invoke(null, [CreateRegistrationContext(registryRoot) ?? throw new InvalidOperationException()]);
+        method?.Invoke(null, [CreateRegistrationContext(registryRoot, type) ?? throw new InvalidOperationException()]);
     }
 
-    protected virtual void GetClassObject(Guid clsid, Guid iid, out object? ppv)
+    protected virtual object? GetClassObject(Guid clsid, Guid iid)
     {
         Trace($"Path:{DllPath} CLSID:{clsid} IID:{iid}");
         foreach (var type in ComTypes)
@@ -123,19 +150,26 @@ public abstract partial class BaseComRegistration
             Trace($"Type:{type.Type.FullName} guid:{type.Type.GUID}");
             if (clsid == type.Type.GUID && iid == typeof(IClassFactory).GUID)
             {
-                ppv = new BaseClassFactory();
-                Trace($"ppv:{ppv}");
-                return;
+                if (!_classFactories.TryGetValue(clsid, out var classFactory))
+                {
+                    classFactory = CreateClassFactory(clsid);
+                    _classFactories[clsid] = classFactory;
+                }
+                Trace($"ClassFactory:{classFactory}");
+                return classFactory;
             }
         }
-        ppv = null;
+        return null;
     }
 
     protected unsafe HRESULT GetClassObject(nint rclsid, nint riid, nint ppv)
     {
+        if (rclsid == 0 || riid == 0 || ppv == 0)
+            return Constants.E_POINTER;
+
         var clsid = *(Guid*)rclsid;
         var iid = *(Guid*)riid;
-        GetClassObject(clsid, iid, out var obj);
+        var obj = GetClassObject(clsid, iid);
         var unk = DirectN.Extensions.Com.ComObject.GetOrCreateComInstance(obj, iid);
         *(nint*)ppv = unk;
         Trace($"unk:{obj}");
@@ -174,8 +208,8 @@ public abstract partial class BaseComRegistration
         return 0;
     }
 
-    private const string _classesRegistryKey = @"Software\Classes";
-    private const string _clsidRegistryKey = _classesRegistryKey + @"\CLSID";
+    public const string ClassesRegistryKey = @"Software\Classes";
+    public const string ClsidRegistryKey = ClassesRegistryKey + @"\CLSID";
 
     public static void RegisterInProcessComObject(RegistryKey root, Type type, string assemblyPath, string? threadingModel = null)
     {
@@ -185,7 +219,7 @@ public abstract partial class BaseComRegistration
 
         threadingModel = threadingModel?.Trim() ?? "Both";
         Trace($"Registering {type.FullName} from {assemblyPath} with threading model '{threadingModel}'...");
-        using var serverKey = EnsureWritableSubKey(root, Path.Combine(_clsidRegistryKey, type.GUID.ToString("B"), "InprocServer32"));
+        using var serverKey = EnsureWritableSubKey(root, Path.Combine(ClsidRegistryKey, type.GUID.ToString("B"), "InprocServer32"));
         serverKey.SetValue(null, assemblyPath);
         serverKey.SetValue("ThreadingModel", threadingModel);
 
@@ -194,12 +228,19 @@ public abstract partial class BaseComRegistration
         if (att != null && !string.IsNullOrWhiteSpace(att.Value))
         {
             var progid = att.Value.Trim();
-            using var key = EnsureWritableSubKey(root, Path.Combine(_clsidRegistryKey, type.GUID.ToString("B")));
+            using var key = EnsureWritableSubKey(root, Path.Combine(ClsidRegistryKey, type.GUID.ToString("B")));
             using var progIdKey = EnsureWritableSubKey(key, "ProgId");
             progIdKey.SetValue(null, progid);
 
-            using var ckey = EnsureWritableSubKey(root, Path.Combine(_classesRegistryKey, progid, "CLSID"));
+            using var ckey = EnsureWritableSubKey(root, Path.Combine(ClassesRegistryKey, progid, "CLSID"));
             ckey.SetValue(null, type.GUID.ToString("B"));
+        }
+
+        var dna = type.GetCustomAttribute<DisplayNameAttribute>();
+        if (dna != null && !string.IsNullOrWhiteSpace(dna.DisplayName))
+        {
+            using var key = EnsureWritableSubKey(root, Path.Combine(ClsidRegistryKey, type.GUID.ToString("B")));
+            key.SetValue(null, dna.DisplayName);
         }
         Trace($"Registered {type.FullName}.");
     }
@@ -210,7 +251,7 @@ public abstract partial class BaseComRegistration
         ArgumentNullException.ThrowIfNull(type);
 
         Trace($"Unregistering {type.FullName}...");
-        using var key = root.OpenSubKey(_clsidRegistryKey, true);
+        using var key = root.OpenSubKey(ClsidRegistryKey, true);
         key?.DeleteSubKeyTree(type.GUID.ToString("B"), false);
 
         // ProgId is optional
@@ -218,14 +259,14 @@ public abstract partial class BaseComRegistration
         if (att != null && !string.IsNullOrWhiteSpace(att.Value))
         {
             var progid = att.Value.Trim();
-            using var ckey = root.OpenSubKey(_classesRegistryKey, true);
+            using var ckey = root.OpenSubKey(ClassesRegistryKey, true);
             ckey?.DeleteSubKeyTree(progid, false);
         }
 
         Trace($"Unregistered {type.FullName}.");
     }
 
-    protected static RegistryKey EnsureWritableSubKey(RegistryKey root, string name)
+    public static RegistryKey EnsureWritableSubKey(RegistryKey root, string name)
     {
         var key = root.OpenSubKey(name, true);
         if (key != null)

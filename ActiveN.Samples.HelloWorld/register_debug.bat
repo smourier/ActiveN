@@ -1,0 +1,1 @@
+regsvr32 ActiveN.Samples.HelloWorld.comthunk.dll /i:user /n

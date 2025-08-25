@@ -1,9 +1,16 @@
 {
   "profiles": {
-    "Profile 1": {
+    "Unregister": {
       "commandName": "Executable",
       "executablePath": "regsvr32",
       "commandLineArgs": "ActiveN.Samples.HelloWorld.comthunk.dll /i:user /n /u",
+      "workingDirectory": "E:\\smo\\GitHub\\ActiveN\\ActiveN.Samples.HelloWorld\\bin\\x64\\Debug\\net9.0-windows10.0.22621.0",
+      "nativeDebugging": true
+    },
+    "Register": {
+      "commandName": "Executable",
+      "executablePath": "regsvr32",
+      "commandLineArgs": "ActiveN.Samples.HelloWorld.comthunk.dll /i:user /n ",
       "workingDirectory": "E:\\smo\\GitHub\\ActiveN\\ActiveN.Samples.HelloWorld\\bin\\x64\\Debug\\net9.0-windows10.0.22621.0",
       "nativeDebugging": true
     }

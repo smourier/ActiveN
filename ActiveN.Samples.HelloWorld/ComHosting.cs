@@ -1,7 +1,7 @@
 ﻿namespace ActiveN.Samples.HelloWorld;
 
 // this class *must* be named ComHosting and reside in assembly root namespace or in assembly root namespace + ".Hosting"
-public class ComHosting : BaseComRegistration
+public class ComHosting : ComRegistration
 {
     public static ComHosting Instance { get; } = new();
 

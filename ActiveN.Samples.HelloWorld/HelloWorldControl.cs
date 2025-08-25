@@ -2,29 +2,21 @@
 
 // TODO: generate another GUID
 [Guid("7883986f-b61e-474e-91b5-7822308e3b7d")]
-[GeneratedComClass]
+[ProgId("ActiveN.Samples.HelloWorld.HelloWorldControl")]
+[DisplayName("ActiveN Hello World Control")]
 [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)]
+[GeneratedComClass]
 public partial class HelloWorldControl : BaseControl
 {
-    public void DoSomething()
-    {
-        BaseComRegistration.Trace("Hello from HelloWorldControl.DoSomething");
-    }
-
-    public void DoSomethingElse()
-    {
-        BaseComRegistration.Trace("Hello from HelloWorldControl.DoSomething");
-    }
-
     public static new HRESULT RegisterType(ComRegistrationContext context)
     {
-        BaseComRegistration.Trace($"Register type {typeof(HelloWorldControl).FullName}...");
+        ComRegistration.Trace($"Register type {typeof(HelloWorldControl).FullName}...");
         return BaseControl.RegisterType(context);
     }
 
     public static new HRESULT UnregisterType(ComRegistrationContext context)
     {
-        BaseComRegistration.Trace($"Unregister type {typeof(HelloWorldControl).FullName}...");
+        ComRegistration.Trace($"Unregister type {typeof(HelloWorldControl).FullName}...");
         return BaseControl.UnregisterType(context);
     }
 }

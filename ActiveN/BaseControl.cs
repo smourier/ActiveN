@@ -9,7 +9,7 @@ public abstract partial class BaseControl :
     protected virtual CustomQueryInterfaceResult GetInterface(ref Guid iid, out nint ppv)
     {
         ppv = 0;
-        BaseComRegistration.Trace($"GetInterface: {iid:B}");
+        ComRegistration.Trace($"GetInterface: {iid:B}");
         return CustomQueryInterfaceResult.NotHandled;
     }
 
@@ -35,13 +35,19 @@ public abstract partial class BaseControl :
 
     protected static HRESULT RegisterType(ComRegistrationContext context)
     {
-        BaseComRegistration.Trace($"Register type {typeof(BaseControl).FullName}...");
+        ArgumentNullException.ThrowIfNull(context);
+        ComRegistration.Trace($"Register type {typeof(BaseControl).FullName}...");
+
+        // add the "Control" subkey to indicate that this is an ActiveX control
+        using var key = ComRegistration.EnsureWritableSubKey(context.RegistryRoot, Path.Combine(ComRegistration.ClsidRegistryKey, context.GUID.ToString("B")));
+        key.CreateSubKey("Control", false)?.Dispose();
         return Constants.S_OK;
     }
 
     protected static HRESULT UnregisterType(ComRegistrationContext context)
     {
-        BaseComRegistration.Trace($"Unregister type {typeof(BaseControl).FullName}...");
+        ArgumentNullException.ThrowIfNull(context);
+        ComRegistration.Trace($"Unregister type {typeof(BaseControl).FullName}...");
         return Constants.S_OK;
     }
 }

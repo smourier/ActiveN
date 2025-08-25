@@ -19,6 +19,7 @@
 		<Using Include="DirectN.Extensions.Utilities" />
 		<Using Include="Microsoft.Win32" />
 		<Using Include="System" />
+		<Using Include="System.Collections.Concurrent" />
 		<Using Include="System.Collections.Generic" />
 		<Using Include="System.ComponentModel" />
 		<Using Include="System.Diagnostics" />
