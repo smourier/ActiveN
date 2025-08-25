@@ -28,7 +28,7 @@ public class ComHosting : BaseComRegistration
 
     // retrieves the class object from a DLL object handler or object application.
     [UnmanagedCallersOnly(EntryPoint = nameof(DllGetClassObject))]
-    public static unsafe uint DllGetClassObject(nint rclsid, nint riid, nint ppv) => WrapErrors(() => Instance.GetClassObject(rclsid, riid, ppv));
+    public static uint DllGetClassObject(nint rclsid, nint riid, nint ppv) => WrapErrors(() => Instance.GetClassObject(rclsid, riid, ppv));
 
     // handles installation and setup for a module.
     // this one is optional but very useful to pass any command line arguments during install/uninstall
@@ -38,6 +38,6 @@ public class ComHosting : BaseComRegistration
     // this is a custom export to initialize thunking support, only in debug builds
 #if DEBUG
     [UnmanagedCallersOnly(EntryPoint = nameof(DllThunkInit))]
-    public static unsafe uint DllThunkInit(nint thunkDllPathPtr) => WrapErrors(() => Instance.ThunkInit(thunkDllPathPtr));
+    public static uint DllThunkInit(nint thunkDllPathPtr) => WrapErrors(() => Instance.ThunkInit(thunkDllPathPtr));
 #endif
 }

@@ -42,6 +42,6 @@ public abstract partial class BaseControl :
     protected static HRESULT UnregisterType(ComRegistrationContext context)
     {
         BaseComRegistration.Trace($"Unregister type {typeof(BaseControl).FullName}...");
-        throw new NotImplementedException();
+        return Constants.S_OK;
     }
 }

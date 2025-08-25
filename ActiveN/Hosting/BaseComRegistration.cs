@@ -167,7 +167,7 @@ public abstract partial class BaseComRegistration
         return install ? RegisterServer() : UnregisterServer();
     }
 
-    protected unsafe uint ThunkInit(nint thunkDllPathPtr)
+    protected uint ThunkInit(nint thunkDllPathPtr)
     {
         ThunkDllPath = Marshal.PtrToStringUni(thunkDllPathPtr);
         Trace($"Path:{DllPath} ThunkDllPathPtr:{ThunkDllPath}");
