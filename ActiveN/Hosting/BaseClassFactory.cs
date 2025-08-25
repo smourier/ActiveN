@@ -1,11 +1,11 @@
 ﻿namespace ActiveN.Hosting;
 
 [GeneratedComClass]
-public partial class ClassFactory : IClassFactory
+public partial class BaseClassFactory : IClassFactory
 {
     HRESULT IClassFactory.CreateInstance(nint pUnkOuter, in Guid riid, out nint ppvObject)
     {
-        ComHosting.Trace($"pUnkOuter:{pUnkOuter} riid:{riid}");
+        //BaseComHosting.Trace($"pUnkOuter:{pUnkOuter} riid:{riid}");
         if (pUnkOuter != 0)
         {
             ppvObject = 0;
@@ -20,14 +20,9 @@ public partial class ClassFactory : IClassFactory
 
     HRESULT IClassFactory.LockServer(BOOL fLock)
     {
-        ComHosting.Trace($"lock:{fLock}");
+        //BaseComHosting.Trace($"lock:{fLock}");
         return Constants.S_OK;
     }
-
-    // the list of types that are COM types
-    public static Type[] ComTypes { get; } =
-    [
-    ];
 
     // cannot build COM abstract class
     protected virtual object CreateInstance(in Guid riid) => throw new NotSupportedException("Must be implemented by derived class.");
