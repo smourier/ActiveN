@@ -1,6 +1,7 @@
 ﻿namespace ActiveN.Samples.HelloWorld;
 
 // this class *must* be named ComHosting and reside in assembly root namespace or in assembly root namespace + ".Hosting"
+// for AotNetComHost.*.dll to find it (this is only for DEBUG builds)
 public class ComHosting : ComRegistration
 {
     public static ComHosting Instance { get; } = new();
@@ -18,28 +19,28 @@ public class ComHosting : ComRegistration
 
     // create registry entries for all types supported in this module.
     [UnmanagedCallersOnly(EntryPoint = nameof(DllRegisterServer))]
-    public static uint DllRegisterServer() => WrapErrors(Instance.RegisterServer);
+    public static uint DllRegisterServer() => Instance.RegisterServer().UValue;
 
     // remove entries created through DllRegisterServer.
     [UnmanagedCallersOnly(EntryPoint = nameof(DllUnregisterServer))]
-    public static uint DllUnregisterServer() => WrapErrors(Instance.UnregisterServer);
+    public static uint DllUnregisterServer() => Instance.UnregisterServer().UValue;
 
     // determines whether the module is in use. If not, the caller can unload the DLL from memory.
     [UnmanagedCallersOnly(EntryPoint = nameof(DllCanUnloadNow))]
-    public static uint DllCanUnloadNow() => WrapErrors(Instance.CanUnloadNow);
+    public static uint DllCanUnloadNow() => Instance.CanUnloadNow().UValue;
 
     // retrieves the class object from a DLL object handler or object application.
     [UnmanagedCallersOnly(EntryPoint = nameof(DllGetClassObject))]
-    public static uint DllGetClassObject(nint rclsid, nint riid, nint ppv) => WrapErrors(() => Instance.GetClassObject(rclsid, riid, ppv));
+    public static uint DllGetClassObject(nint rclsid, nint riid, nint ppv) => Instance.GetClassObject(rclsid, riid, ppv).UValue;
 
     // handles installation and setup for a module.
     // this one is optional but very useful to pass any command line arguments during install/uninstall
     [UnmanagedCallersOnly(EntryPoint = nameof(DllInstall))]
-    public static uint DllInstall(bool install, nint cmdLinePtr) => WrapErrors(() => Instance.Install(install, cmdLinePtr));
+    public static uint DllInstall(bool install, nint cmdLinePtr) => Instance.Install(install, cmdLinePtr).UValue;
 
     // this is a custom export to initialize thunking support, only in debug builds
 #if DEBUG
     [UnmanagedCallersOnly(EntryPoint = nameof(DllThunkInit))]
-    public static uint DllThunkInit(nint thunkDllPathPtr) => WrapErrors(() => Instance.ThunkInit(thunkDllPathPtr));
+    public static uint DllThunkInit(nint thunkDllPathPtr) => Instance.ThunkInit(thunkDllPathPtr).UValue;
 #endif
 }
