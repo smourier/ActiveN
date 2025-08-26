@@ -20,19 +20,22 @@ public sealed class TypeLib
 
     public override string ToString() => $"{Name} ({TypeLibId}, v{MajorVersion}.{MinorVersion}, lcid={Lcid}, syskind={SysKind}, flags=0x{LibFlags:X4})";
 
-    private static ComObject<ITypeLib> LoadTypeLib(string filePath, bool throwOnError = true)
+    public static ComObject<ITypeLib>? LoadTypeLib(string filePath, bool throwOnError = true)
     {
         ArgumentNullException.ThrowIfNull(filePath);
         Functions.LoadTypeLibEx(PWSTR.From(filePath), REGKIND.REGKIND_NONE, out var obj).ThrowOnError(throwOnError);
-        return new ComObject<ITypeLib>(obj);
+        return obj != null ? new ComObject<ITypeLib>(obj) : null;
     }
 
     public void RegisterForCoClass(Guid clsid, RegistryKey registryRoot)
     {
         ArgumentNullException.ThrowIfNull(registryRoot);
-        using var key = ComRegistration.EnsureWritableSubKey(registryRoot, Path.Combine(ComRegistration.ClsidRegistryKey, clsid.ToString("B")));
-        using var typeLib = key.CreateSubKey("TypeLib", true);
+        using var typeLib = ComRegistration.EnsureWritableSubKey(registryRoot, Path.Combine(ComRegistration.ClsidRegistryKey, clsid.ToString("B"), "TypeLib"));
         typeLib.SetValue(null, TypeLibId.ToString("B"));
+
+        using var version = ComRegistration.EnsureWritableSubKey(registryRoot, Path.Combine(ComRegistration.ClsidRegistryKey, clsid.ToString("B"), "Version"));
+        // if type lib is there, it will update it later
+        version.SetValue(null, $"{MajorVersion}.{MinorVersion}");
     }
 
 #pragma warning disable CA1822 // Mark members as static
@@ -71,24 +74,6 @@ public sealed class TypeLib
         else
         {
             Functions.UnRegisterTypeLib(TypeLibId, MajorVersion, MinorVersion, Lcid, SysKind).ThrowOnError(throwOnError);
-        }
-    }
-
-    public static bool HasEmbeddedTypeLib(string filePath)
-    {
-        ArgumentNullException.ThrowIfNull(filePath);
-        var module = Functions.LoadLibraryExW(PWSTR.From(filePath), 0, LOAD_LIBRARY_FLAGS.LOAD_LIBRARY_AS_DATAFILE | LOAD_LIBRARY_FLAGS.LOAD_LIBRARY_AS_IMAGE_RESOURCE);
-        if (module == 0)
-            return false;
-
-        try
-        {
-            // 1 here matches csproj's <TypeLibRc> number before TYPELIB
-            return Functions.FindResourceW(module, new PWSTR(1), PWSTR.From("TYPELIB")) != 0;
-        }
-        finally
-        {
-            Functions.FreeLibrary(module);
         }
     }
 

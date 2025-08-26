@@ -40,7 +40,7 @@ public abstract partial class ComRegistration
         _dllPath = new Lazy<string>(GetDllPath);
 
         Trace($"Path:{DllPath} Types:{string.Join(", ", ComTypes.Select(t => t.Type.FullName))} entry asm: '{DllPath}'");
-        RegisterEmbeddedTypeLib = TypeLib.HasEmbeddedTypeLib(DllPath);
+        RegisterEmbeddedTypeLib = ResourceUtilities.HasEmbeddedTypeLib(DllPath);
         Trace($"RegisterEmbeddedTypeLib: '{RegisterEmbeddedTypeLib}'");
     }
 
@@ -49,6 +49,7 @@ public abstract partial class ComRegistration
     public string DllPath => _dllPath.Value;
     public virtual bool RegisterEmbeddedTypeLib { get; protected set; }
     public virtual bool InstallInHkcu { get; protected set; }
+    public virtual bool CanUnload { get; protected set; }
     public virtual string? ThreadingModel { get; protected set; } // default is "Both"
     public string? ThunkDllPath { get; protected set; }
     public string RegistrationDllPath => ThunkDllPath ?? DllPath;
@@ -211,9 +212,19 @@ public abstract partial class ComRegistration
         }
 
         var method = type.Type.GetMethod(nameof(RegisterType), BindingFlags.Public | BindingFlags.Static);
-        var ctx = CreateRegistrationContext(registryRoot, type) ?? throw new InvalidOperationException();
-        ctx.TypeLib = typeLib;
-        method?.Invoke(null, [ctx]);
+        if (method != null)
+        {
+            var ctx = CreateRegistrationContext(registryRoot, type) ?? throw new InvalidOperationException();
+            ctx.TypeLib = typeLib;
+
+            var misc = type.Type.GetCustomAttribute<MiscStatusAttribute>();
+            if (misc != null)
+            {
+                ctx.MiscStatus = misc.Value;
+            }
+
+            method.Invoke(null, [ctx]);
+        }
     }
 
     protected virtual HRESULT UnregisterServer() => WrapErrors(() =>
@@ -253,9 +264,12 @@ public abstract partial class ComRegistration
         }
 
         var method = type.Type.GetMethod(nameof(UnregisterType), BindingFlags.Public | BindingFlags.Static);
-        var ctx = CreateRegistrationContext(registryRoot, type) ?? throw new InvalidOperationException();
-        ctx.TypeLib = typeLib;
-        method?.Invoke(null, [ctx]);
+        if (method != null)
+        {
+            var ctx = CreateRegistrationContext(registryRoot, type) ?? throw new InvalidOperationException();
+            ctx.TypeLib = typeLib;
+            method.Invoke(null, [ctx]);
+        }
     }
 
     protected virtual object? GetClassObject(Guid clsid, Guid iid)
@@ -264,7 +278,8 @@ public abstract partial class ComRegistration
         foreach (var type in ComTypes)
         {
             Trace($"Type:{type.Type.FullName} guid:{type.Type.GUID}");
-            if (clsid == type.Type.GUID && iid == typeof(IClassFactory).GUID)
+            if (clsid == type.Type.GUID &&
+                (iid == typeof(IClassFactory).GUID || iid == typeof(IUnknown).GUID))
             {
                 if (!_classFactories.TryGetValue(clsid, out var classFactory))
                 {
@@ -294,8 +309,8 @@ public abstract partial class ComRegistration
 
     protected virtual HRESULT CanUnloadNow() => WrapErrors(() =>
     {
-        Trace($"Path:{DllPath}");
-        return (uint)Constants.S_FALSE;
+        Trace($"Path:{DllPath} CanUnload:{CanUnload}");
+        return CanUnload ? (uint)Constants.S_OK : (uint)Constants.S_FALSE;
     });
 
     // call for example
@@ -353,6 +368,9 @@ public abstract partial class ComRegistration
             using var key = EnsureWritableSubKey(root, Path.Combine(ClsidRegistryKey, type.GUID.ToString("B")));
             using var progIdKey = EnsureWritableSubKey(key, "ProgId");
             progIdKey.SetValue(null, progid);
+
+            using var viProgIdKey = EnsureWritableSubKey(key, "VersionIndependentProgID");
+            viProgIdKey.SetValue(null, progid);
 
             using var ckey = EnsureWritableSubKey(root, Path.Combine(ClassesRegistryKey, progid, "CLSID"));
             ckey.SetValue(null, type.GUID.ToString("B"));

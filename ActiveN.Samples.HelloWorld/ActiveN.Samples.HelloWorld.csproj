@@ -32,6 +32,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<None Remove="ActiveN.Samples.HelloWorld.bmp" />
 		<None Remove="ActiveN.Samples.HelloWorld.idl" />
 	</ItemGroup>
 
@@ -97,10 +98,15 @@
 
 	<ItemGroup>
 		<AvailableItemName Include="Midl" />
+		<AvailableItemName Include="ToolBoxBitmap32" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<Midl Include="ActiveN.Samples.HelloWorld.idl" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ToolBoxBitmap32 Include="ActiveN.Samples.HelloWorld.bmp" />
 	</ItemGroup>
 
 	<!-- builds TLBs from IDL files in a C# project. Needs GetWindowsSDKPaths.targets in the same directory as this file -->
@@ -147,8 +153,14 @@
 					END
 				END
 			</TypeLibRc>
+
+			<BitmapRc>
+				1 BITMAP %(ToolBoxBitmap32.FileName).bmp
+			</BitmapRc>
+			
 		</PropertyGroup>
 		<WriteLinesToFile File="$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)tlb\%(Midl.FileName).rc" Overwrite="true" Lines="$(TypeLibRc)" />
+		<WriteLinesToFile File="$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)tlb\%(Midl.FileName).rc" Condition="@(ToolBoxBitmap32) != ''" Lines="$(BitmapRc)" />
 
 		<!-- compiles the .rc into a .res -->
 		<Exec Command="call &quot;@(WindowsSDKBinPath)\rc.exe&quot; &quot;$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)tlb\%(Midl.FileName).rc&quot;" />

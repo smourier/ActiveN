@@ -13,6 +13,7 @@
 	<ItemGroup>
 		<Using Include="ActiveN" />
 		<Using Include="ActiveN.Hosting" />
+		<Using Include="ActiveN.Utilities" />
 		<Using Include="DirectN" />
 		<Using Include="DirectN.Extensions" />
 		<Using Include="DirectN.Extensions.Com" />
@@ -42,10 +43,6 @@
 		<Reference Include="DirectN.Extensions">
 			<HintPath>External\DirectN.Extensions.dll</HintPath>
 		</Reference>
-	</ItemGroup>
-
-	<ItemGroup>
-	  <Folder Include="Utilities\" />
 	</ItemGroup>
 
 </Project>

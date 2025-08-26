@@ -4,7 +4,7 @@
 public abstract partial class BaseControl : IDisposable,
     IOleObject,
     IOleControl,
-    //IProvideClassInfo,
+    IProvideClassInfo,
     IPersistStreamInit,
     IViewObject2,
     IViewObjectEx,
@@ -17,6 +17,8 @@ public abstract partial class BaseControl : IDisposable,
     private readonly ComObject<IOleAdviseHolder> _adviseHolder;
     private ComObject<IOleClientSite>? _clientSite;
     private ComObject<IAdviseSink>? _adviseSink;
+    private ComObject<ITypeInfo>? _typeInfo;
+    private bool _typeInfoLoaded;
     private bool _disposedValue;
     private bool _isDirty;
 
@@ -27,7 +29,10 @@ public abstract partial class BaseControl : IDisposable,
         _adviseHolder = new ComObject<IOleAdviseHolder>(obj);
     }
 
-    protected virtual POINTERINACTIVE PointerActivationPolicy => POINTERINACTIVE.POINTERINACTIVE_ACTIVATEONENTRY;
+    protected abstract ComRegistration ComRegistration { get; }
+
+    public virtual POINTERINACTIVE PointerActivationPolicy => POINTERINACTIVE.POINTERINACTIVE_ACTIVATEONENTRY;
+    public virtual OLEMISC MiscStatus => OLEMISC.OLEMISC_RECOMPOSEONRESIZE | OLEMISC.OLEMISC_CANTLINKINSIDE | OLEMISC.OLEMISC_INSIDEOUT | OLEMISC.OLEMISC_ACTIVATEWHENVISIBLE | OLEMISC.OLEMISC_SETCLIENTSITEFIRST;
 
     protected virtual void AddConnectionPoint(IConnectionPoint connectionPoint)
     {
@@ -43,6 +48,23 @@ public abstract partial class BaseControl : IDisposable,
         connectionPoint.GetConnectionInterface(out var iid).ThrowOnError();
         if (!_connectionPoints.TryAdd(iid, connectionPoint))
             throw new ArgumentException($"Connection point with iid {iid} is already registered", nameof(connectionPoint));
+    }
+
+    protected virtual ComObject<ITypeInfo>? EnsureTypeInfo()
+    {
+        if (!_typeInfoLoaded)
+        {
+            var reg = ComRegistration ?? throw new InvalidOperationException("ComRegistration is not set");
+            using var typeLib = TypeLib.LoadTypeLib(reg.DllPath, throwOnError: false);
+            if (typeLib != null)
+            {
+                var hr = typeLib.Object.GetTypeInfoOfGuid(GetType().GUID, out var ti);
+                ComRegistration.Trace($"GetTypeInfoOfGuid: {GetType().GUID:B} hr:{hr}");
+                _typeInfo = ti != null ? new ComObject<ITypeInfo>(ti) : null;
+            }
+            _typeInfoLoaded = true;
+        }
+        return _typeInfo;
     }
 
     CustomQueryInterfaceResult ICustomQueryInterface.GetInterface(ref Guid iid, out nint ppv) => GetInterface(ref iid, out ppv);
@@ -78,16 +100,40 @@ public abstract partial class BaseControl : IDisposable,
 
         // add the "Control" subkey to indicate that this is an ActiveX control
         using var key = ComRegistration.EnsureWritableSubKey(context.RegistryRoot, Path.Combine(ComRegistration.ClsidRegistryKey, context.GUID.ToString("B")));
-        key.CreateSubKey("Control", false)?.Dispose();
-        key.CreateSubKey("Insertable", false)?.Dispose();
-        key.CreateSubKey("Programmable", false)?.Dispose();
 
-        using var cats = key.CreateSubKey("Implemented Categories", true);
-        cats.CreateSubKey($"{Categories.CATID_Programmable:B}", false)?.Dispose();
-        cats.CreateSubKey($"{Categories.CATID_Insertable:B}", false)?.Dispose();
-        cats.CreateSubKey($"{Categories.CATID_SafeForScripting:B}", false)?.Dispose();
-        cats.CreateSubKey($"{Categories.CATID_SafeForInitializing:B}", false)?.Dispose();
-        cats.CreateSubKey($"{Categories.CATID_Control:B}", false)?.Dispose();
+        if (context.ImplementedCategories.Contains(Categories.CATID_Control))
+        {
+            key.CreateSubKey("Control", false)?.Dispose();
+        }
+
+        if (context.ImplementedCategories.Contains(Categories.CATID_Insertable))
+        {
+            key.CreateSubKey("Insertable", false)?.Dispose();
+        }
+
+        if (context.ImplementedCategories.Contains(Categories.CATID_Programmable))
+        {
+            key.CreateSubKey("Programmable", false)?.Dispose();
+        }
+
+        if (context.ImplementedCategories?.Count > 0)
+        {
+            using var cats = key.CreateSubKey("Implemented Categories", true);
+            foreach (var cat in context.ImplementedCategories)
+            {
+                cats.CreateSubKey($"{cat:B}", false)?.Dispose();
+            }
+        }
+
+        using var miscStatus = key.CreateSubKey("MiscStatus", true);
+        miscStatus.SetValue(null, ((int)context.MiscStatus).ToString());
+
+        // we currently only support bitmaps with id 1
+        if (ResourceUtilities.HasEmbeddedBitmap(context.Registration.DllPath))
+        {
+            using var bitmap = key.CreateSubKey("ToolboxBitmap32", true);
+            bitmap.SetValue(null, $"{context.Registration.DllPath},1");
+        }
 
         return Constants.S_OK;
     }
@@ -195,12 +241,13 @@ public abstract partial class BaseControl : IDisposable,
 
     HRESULT IOleObject.SetColorScheme(in LOGPALETTE pLogpal) => NotImplemented();
 
-    //HRESULT IProvideClassInfo.GetClassInfo(out ITypeInfo ppTI)
-    //{
-    //    ComRegistration.Trace($"E_UNEXPECTED");
-    //    ppTI = null!;
-    //    return Constants.E_UNEXPECTED;
-    //}
+    HRESULT IProvideClassInfo.GetClassInfo(out ITypeInfo ppTI)
+    {
+        var ti = EnsureTypeInfo();
+        ppTI = ti != null ? ti.Object : null!;
+        ComRegistration.Trace($"ppTI {ppTI}");
+        return ti != null ? Constants.S_OK : Constants.E_UNEXPECTED;
+    }
 
     HRESULT IPersistStreamInit.IsDirty() => _isDirty ? Constants.S_OK : Constants.S_FALSE;
 
