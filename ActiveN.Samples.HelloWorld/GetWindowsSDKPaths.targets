@@ -1,0 +1,134 @@
+﻿<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+	<UsingTask
+	  TaskName="GetWindowsSDKPaths"
+	  TaskFactory="RoslynCodeTaskFactory"
+	  AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll" >
+		<ParameterGroup>
+			<SdkPath ParameterType="System.String" Output="true" />
+			<SdkIncludePath ParameterType="System.String" Output="true" />
+			<SdkIncludePaths ParameterType="System.String[]" Output="true" />
+			<SdkBinPath ParameterType="System.String" Output="true" />
+			<SdkLibPath ParameterType="System.String" Output="true" />
+			<VsInstallPath ParameterType="System.String" Output="true" />
+			<VcToolsPath ParameterType="System.String" Output="true" />
+		</ParameterGroup>
+		<Task>
+			<Using Namespace="System"/>
+			<Using Namespace="System.IO"/>
+			<Using Namespace="System.Linq"/>
+			<Using Namespace="System.Runtime.InteropServices"/>
+			<Code Type="Method" Language="cs">
+				<![CDATA[
+public override bool Execute()
+{
+	// get Windows SDK path
+	SdkPath = Microsoft.Build.Utilities.ToolLocationHelper. GetPlatformSDKLocation("Windows", "10.0");
+	if (string.IsNullOrEmpty(SdkPath))
+	{
+		SdkPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Windows Kits", "10");
+	}
+
+	// get all SDK include paths
+	var includes = Path.Combine(SdkPath, "Include");
+	var versions = new List<(string, Version)>();
+	foreach(var incDir in Directory.GetDirectories(includes))
+	{
+		if (Version.TryParse(Path.GetFileName(incDir), out var version))
+		{
+			versions.Add((incDir, version));
+		}
+	}
+
+	if (versions.Count > 0)
+	{
+		// get most recent midl.exe
+		SdkIncludePath  = versions.OrderByDescending(l => l.Item2).First().Item1;
+		SdkIncludePaths = Directory.GetDirectories(SdkIncludePath).ToArray();
+	}
+
+	// get all SDK bin paths
+	var bitNess = IntPtr.Size == 8 ? "x64" :"x86";
+	var bins = Path.Combine(SdkPath, "Bin");
+	versions.Clear();
+	foreach(var binDir in Directory.GetDirectories(bins))
+	{
+		var bitnessPath = Path.Combine(binDir, bitNess);
+		if (Directory.Exists(bitnessPath) && Version.TryParse(Path.GetFileName(binDir), out var version))
+		{
+			versions.Add((bitnessPath, version));
+		}
+	}
+
+	if (versions.Count > 0)
+	{
+		// get most recent bin path
+		SdkBinPath  = versions.OrderByDescending(l => l.Item2).First().Item1;
+	}
+
+	// get all SDK lib paths
+	var libs = Path.Combine(SdkPath, "Lib");
+	versions.Clear();
+	foreach(var libDir in Directory.GetDirectories(libs))
+	{
+		if (Version.TryParse(Path.GetFileName(libDir), out var version))
+		{
+			versions.Add((libDir, version));
+		}
+	}
+
+	if (versions.Count > 0)
+	{
+		// get most recent lib path
+		SdkLibPath  = versions.OrderByDescending(l => l.Item2).First().Item1;
+	}
+	
+	// get current VS install path
+	var type = Type.GetTypeFromProgID("Microsoft.VisualStudio.Setup.Configuration");
+	var conf = (VsSetup.ISetupConfiguration)Activator.CreateInstance(type);
+	var instance = conf.GetInstanceForCurrentProcess();
+	VsInstallPath = instance.GetInstallationPath();
+
+	var msvc = Path.Combine(VsInstallPath, "VC", "Tools", "MSVC");
+	versions.Clear();
+	foreach(var toolsDir in Directory.GetDirectories(msvc))
+	{
+		if (Version.TryParse(Path.GetFileName(toolsDir), out var version) ||
+			Version.TryParse(Path.GetFileName(toolsDir) + ".0", out version))
+		{
+			versions.Add((toolsDir, version));
+		}
+	}
+
+	if (versions.Count > 0)
+	{
+		// get most recent tools path
+		VcToolsPath  = versions.OrderByDescending(l => l.Item2).First().Item1;
+	}
+	
+	return true;
+}
+
+public static class VsSetup
+{
+	[ComImport, Guid("42843719-DB4C-46C2-8E7C-64F1816EFD5B"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+	public interface ISetupConfiguration
+	{
+		void Unused();
+		ISetupInstance GetInstanceForCurrentProcess();
+	}
+
+	[ComImport, Guid("B41463C3-8866-43B5-BC33-2B0676F7F42E"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+	public interface ISetupInstance
+	{
+		void Unused0();
+		void Unused1();
+		void Unused2();
+		string GetInstallationPath();
+	}
+}
+
+]]>
+			</Code>
+		</Task>
+	</UsingTask>
+</Project>
