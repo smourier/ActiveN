@@ -4,18 +4,6 @@ import "ocidl.idl";
 // TODO: generate other uuids
 
 [
-	object,
-	dual,
-	helpstring("IHelloWorldControl Interface"),
-	oleautomation,
-	uuid(00000002-2126-40c8-a2f3-8fa83f8cc1f6)
-]
-interface IHelloWorldControl : IDispatch
-{
-	HRESULT ComputePi([out, retval] double* ret);
-};
-
-[
 	uuid(00000000-2126-40c8-a2f3-8fa83f8cc1f6),
 	version(1.0),
 	helpstring("ActiveN.Samples.HelloWorld 1.0 Type Library")
@@ -24,6 +12,18 @@ interface IHelloWorldControl : IDispatch
 library ActiveNSamplesHelloWorldLib
 {
 	importlib("stdole2.tlb");
+
+	[
+		object,
+		dual,
+		helpstring("IHelloWorldControl Interface"),
+		oleautomation,
+		uuid(00000002-2126-40c8-a2f3-8fa83f8cc1f6)
+	]
+	interface IHelloWorldControl : IDispatch
+	{
+		HRESULT ComputePi([out, retval] double* ret);
+	};
 
 	[
 		uuid(7883986f-b61e-474e-91b5-7822308e3b7d),
