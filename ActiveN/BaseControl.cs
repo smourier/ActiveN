@@ -259,7 +259,7 @@ public abstract partial class BaseControl : BaseDispatch,
     HRESULT IPersistStreamInit.Save(IStream pStm, BOOL fClearDirty)
     {
         _isDirty = !fClearDirty;
-        TracingUtilities.Trace($"pStm {pStm} fClearDirty:{fClearDirty}");
+        TracingUtilities.Trace($"pStm {pStm} fClearDirty: {fClearDirty}");
         return Constants.S_OK;
     }
 
@@ -362,13 +362,13 @@ public abstract partial class BaseControl : BaseDispatch,
 
     HRESULT IPointerInactive.OnInactiveMouseMove(in RECT pRectBounds, int x, int y, uint grfKeyState)
     {
-        TracingUtilities.Trace($"pRectBounds: {pRectBounds} x: {x} y: {y} grfKeyState:{grfKeyState}");
+        TracingUtilities.Trace($"pRectBounds: {pRectBounds} x: {x} y: {y} grfKeyState: {grfKeyState}");
         return Constants.S_OK;
     }
 
     HRESULT IPointerInactive.OnInactiveSetCursor(in RECT pRectBounds, int x, int y, uint dwMouseMsg, BOOL fSetAlways)
     {
-        TracingUtilities.Trace($"pRectBounds: {pRectBounds} x: {x} y: {y} dwMouseMsg:{dwMouseMsg} fSetAlways:{fSetAlways}");
+        TracingUtilities.Trace($"pRectBounds: {pRectBounds} x: {x} y: {y} dwMouseMsg: {dwMouseMsg} fSetAlways: {fSetAlways}");
         return Constants.S_OK;
     }
 

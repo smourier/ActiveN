@@ -10,7 +10,7 @@ public partial class ClassFactory(Guid clsid, ComRegistration registration) : IC
 
     HRESULT IClassFactory.CreateInstance(nint pUnkOuter, in Guid riid, out nint ppvObject)
     {
-        //BaseComHosting.Trace($"pUnkOuter:{pUnkOuter} riid:{riid}");
+        //BaseComHosting.Trace($"pUnkOuter: {pUnkOuter} riid: {riid}");
         var hr = ComRegistration.CreateInstance(this, pUnkOuter, riid, out var instance);
         if (hr.IsError)
         {
@@ -25,7 +25,7 @@ public partial class ClassFactory(Guid clsid, ComRegistration registration) : IC
 
     HRESULT IClassFactory.LockServer(BOOL fLock)
     {
-        //BaseComHosting.Trace($"lock:{fLock}");
+        //BaseComHosting.Trace($"lock: {fLock}");
         return Constants.S_OK;
     }
 }

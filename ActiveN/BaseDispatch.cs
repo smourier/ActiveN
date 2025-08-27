@@ -24,7 +24,7 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
             if (typeLib != null)
             {
                 var hr = typeLib.Object.GetTypeInfoOfGuid(GetType().GUID, out var ti);
-                TracingUtilities.Trace($"GetTypeInfoOfGuid: {GetType().GUID:B} hr:{hr}");
+                TracingUtilities.Trace($"GetTypeInfoOfGuid: {GetType().GUID:B} hr: {hr}");
                 _typeInfo = ti != null ? new ComObject<ITypeInfo>(ti) : null;
             }
             _typeInfoLoaded = true;
@@ -379,7 +379,7 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
                         continue;
 
                     var name = TypeLib.GetName(refTypeInfo.Object, funcDesc.Value.memid);
-                    TracingUtilities.Trace($"funcDesc: id:{funcDesc.Value.memid} name:'{name}' kind:{funcDesc.Value.funckind} invkind:{funcDesc.Value.invkind} params:{funcDesc.Value.cParams} paramsOpt:{funcDesc.Value.cParamsOpt} flags:{funcDesc.Value.wFuncFlags}");
+                    TracingUtilities.Trace($"funcDesc: id: {funcDesc.Value.memid} name:'{name}' kind: {funcDesc.Value.funckind} invkind: {funcDesc.Value.invkind} params: {funcDesc.Value.cParams} paramsOpt: {funcDesc.Value.cParamsOpt} flags: {funcDesc.Value.wFuncFlags}");
                     if (name == null)
                         continue;
 

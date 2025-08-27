@@ -25,7 +25,7 @@ public static class TracingUtilities
         }
         Directory.SetCurrentDirectory(dir);
         _traceWriter = new StreamWriter(Path.Combine(dir, $"{Guid.NewGuid():N}.ActiveN.log")) { AutoFlush = true };
-        _traceWriter?.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}][{_threadId}]Log starting, process:{process.ProcessName} ({process.Id})");
+        _traceWriter?.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}][{_threadId}]Log starting, process: {process.ProcessName} ({process.Id})");
         return true;
     });
 
@@ -41,7 +41,7 @@ public static class TracingUtilities
 
         void trace()
         {
-            _traceWriter?.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}][{Environment.CurrentManagedThreadId}]{(filePath != null ? Path.GetFileNameWithoutExtension(filePath) : null)}::{methodName}:{text}");
+            _traceWriter?.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}][{Environment.CurrentManagedThreadId}]{(filePath != null ? Path.GetFileNameWithoutExtension(filePath) : null)}:: {methodName}: {text}");
         }
     }
 
@@ -55,6 +55,6 @@ public static class TracingUtilities
     {
         TraceToWriter(text, methodName, filePath);
         var name = filePath != null ? Path.GetFileNameWithoutExtension(filePath) : null;
-        EventProvider.Default.WriteMessageEvent($"[{Environment.CurrentManagedThreadId}]{name}::{methodName}:{text}");
+        EventProvider.Default.WriteMessageEvent($"[{Environment.CurrentManagedThreadId}]{name}:: {methodName}: {text}");
     }
 }

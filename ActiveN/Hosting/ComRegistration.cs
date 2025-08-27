@@ -39,7 +39,7 @@ public abstract partial class ComRegistration
 
         _dllPath = new Lazy<string>(GetDllPath);
 
-        TracingUtilities.Trace($"Path:{DllPath} Types:{string.Join(", ", ComTypes.Select(t => t.Type.FullName))} entry asm: '{DllPath}'");
+        TracingUtilities.Trace($"Path: {DllPath} Types: {string.Join(", ", ComTypes.Select(t => t.Type.FullName))} entry asm: '{DllPath}'");
         RegisterEmbeddedTypeLib = ResourceUtilities.HasEmbeddedTypeLib(DllPath);
         TracingUtilities.Trace($"RegisterEmbeddedTypeLib: '{RegisterEmbeddedTypeLib}'");
     }
@@ -98,7 +98,7 @@ public abstract partial class ComRegistration
         catch (SecurityException se)
         {
             // transform this one as a well-known access denied
-            TracingUtilities.Trace($"Ex:{se}");
+            TracingUtilities.Trace($"Ex: {se}");
             if (actionOnError != null)
             {
                 try
@@ -107,7 +107,7 @@ public abstract partial class ComRegistration
                 }
                 catch (Exception ex2)
                 {
-                    TracingUtilities.Trace($"Ex2:{ex2}");
+                    TracingUtilities.Trace($"Ex2: {ex2}");
                     // continue;
                 }
             }
@@ -115,7 +115,7 @@ public abstract partial class ComRegistration
         }
         catch (Exception ex)
         {
-            TracingUtilities.Trace($"Ex:{ex}");
+            TracingUtilities.Trace($"Ex: {ex}");
             if (actionOnError != null)
             {
                 try
@@ -124,7 +124,7 @@ public abstract partial class ComRegistration
                 }
                 catch (Exception ex2)
                 {
-                    TracingUtilities.Trace($"Ex2:{ex2}");
+                    TracingUtilities.Trace($"Ex2: {ex2}");
                     // continue;
                 }
             }
@@ -142,7 +142,7 @@ public abstract partial class ComRegistration
         catch (SecurityException se)
         {
             // transform this one as a well-known access denied
-            TracingUtilities.Trace($"Ex:{se}");
+            TracingUtilities.Trace($"Ex: {se}");
             if (actionOnError != null)
             {
                 try
@@ -151,7 +151,7 @@ public abstract partial class ComRegistration
                 }
                 catch (Exception ex2)
                 {
-                    TracingUtilities.Trace($"Ex2:{ex2}");
+                    TracingUtilities.Trace($"Ex2: {ex2}");
                     // continue;
                 }
             }
@@ -159,7 +159,7 @@ public abstract partial class ComRegistration
         }
         catch (Exception ex)
         {
-            TracingUtilities.Trace($"Ex:{ex}");
+            TracingUtilities.Trace($"Ex: {ex}");
             if (actionOnError != null)
             {
                 try
@@ -168,7 +168,7 @@ public abstract partial class ComRegistration
                 }
                 catch (Exception ex2)
                 {
-                    TracingUtilities.Trace($"Ex2:{ex2}");
+                    TracingUtilities.Trace($"Ex2: {ex2}");
                     // continue;
                 }
             }
@@ -178,7 +178,7 @@ public abstract partial class ComRegistration
 
     protected virtual HRESULT RegisterServer() => WrapErrors(() =>
     {
-        TracingUtilities.Trace($"Path:{DllPath}");
+        TracingUtilities.Trace($"Path: {DllPath}");
 
         TypeLib? typeLib = null;
         if (RegisterEmbeddedTypeLib)
@@ -203,7 +203,7 @@ public abstract partial class ComRegistration
     {
         ArgumentNullException.ThrowIfNull(type);
         ArgumentNullException.ThrowIfNull(registryRoot);
-        TracingUtilities.Trace($"Type:{type.Type.FullName} guid:{type.Type.GUID}");
+        TracingUtilities.Trace($"Type: {type.Type.FullName} guid: {type.Type.GUID}");
         RegisterInProcessComObject(registryRoot, type.Type, RegistrationDllPath, ThreadingModel);
 
         if (RegisterEmbeddedTypeLib)
@@ -229,7 +229,7 @@ public abstract partial class ComRegistration
 
     protected virtual HRESULT UnregisterServer() => WrapErrors(() =>
     {
-        TracingUtilities.Trace($"Path:{DllPath}");
+        TracingUtilities.Trace($"Path: {DllPath}");
         var root = InstallInHkcu ? Registry.CurrentUser : Registry.LocalMachine;
 
         TypeLib? typeLib = null;
@@ -274,10 +274,10 @@ public abstract partial class ComRegistration
 
     protected virtual object? GetClassObject(Guid clsid, Guid iid)
     {
-        TracingUtilities.Trace($"Path:{DllPath} clsid:{clsid} iid:{iid.GetName()}");
+        TracingUtilities.Trace($"Path: {DllPath} clsid: {clsid} iid: {iid.GetName()}");
         foreach (var type in ComTypes)
         {
-            TracingUtilities.Trace($"Type:{type.Type.FullName} guid:{type.Type.GUID}");
+            TracingUtilities.Trace($"Type: {type.Type.FullName} guid: {type.Type.GUID}");
             if (clsid == type.Type.GUID &&
                 (iid == typeof(IClassFactory).GUID || iid == typeof(IUnknown).GUID))
             {
@@ -286,7 +286,7 @@ public abstract partial class ComRegistration
                     classFactory = CreateClassFactory(clsid);
                     _classFactories[clsid] = classFactory;
                 }
-                TracingUtilities.Trace($"ClassFactory:{classFactory}");
+                TracingUtilities.Trace($"ClassFactory: {classFactory}");
                 return classFactory;
             }
         }
@@ -303,13 +303,13 @@ public abstract partial class ComRegistration
         var obj = GetClassObject(clsid, iid);
         var unk = DirectN.Extensions.Com.ComObject.GetOrCreateComInstance(obj, iid);
         *(nint*)ppv = unk;
-        TracingUtilities.Trace($"unk:{obj}");
+        TracingUtilities.Trace($"unk: {obj}");
         return unk == 0 ? Constants.E_NOINTERFACE : Constants.S_OK;
     });
 
     protected virtual HRESULT CanUnloadNow() => WrapErrors(() =>
     {
-        TracingUtilities.Trace($"Path:{DllPath} CanUnload:{CanUnload}");
+        TracingUtilities.Trace($"Path: {DllPath} CanUnload: {CanUnload}");
         TracingUtilities.FlushTextWriter(); // host asking to quit, it's a good time to flush traces
         return CanUnload ? (uint)Constants.S_OK : (uint)Constants.S_FALSE;
     });
@@ -319,11 +319,11 @@ public abstract partial class ComRegistration
     // "regsvr32 /i:user /n /u" to unregister from HKCU
     protected virtual HRESULT Install(bool install, nint cmdLinePtr) => WrapErrors(() =>
     {
-        TracingUtilities.Trace($"Path:{DllPath}");
+        TracingUtilities.Trace($"Path: {DllPath}");
         if (cmdLinePtr != 0)
         {
             var cmdLine = Marshal.PtrToStringUni(cmdLinePtr);
-            TracingUtilities.Trace($"CmdLine:{cmdLine}");
+            TracingUtilities.Trace($"CmdLine: {cmdLine}");
             if (string.Equals(cmdLine, "user", StringComparison.OrdinalIgnoreCase))
             {
                 InstallInHkcu = true;
@@ -342,7 +342,7 @@ public abstract partial class ComRegistration
     protected HRESULT ThunkInit(nint thunkDllPathPtr) => WrapErrors(() =>
     {
         ThunkDllPath = Marshal.PtrToStringUni(thunkDllPathPtr);
-        TracingUtilities.Trace($"Path:{DllPath} ThunkDllPathPtr:{ThunkDllPath}");
+        TracingUtilities.Trace($"Path: {DllPath} ThunkDllPathPtr: {ThunkDllPath}");
         return 0;
     });
 
