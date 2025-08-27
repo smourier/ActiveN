@@ -34,6 +34,9 @@ library ActiveNSamplesHelloWorldLib
 		[propget, bindable, requestedit, id(DISPID_HWND)]
 		HRESULT HWND([out, retval]LONG_PTR* pHWND);
 
+		// methods must match HelloWorldControl's public methods & IHelloWorldControl interface
+		HRESULT ComputePi([out, retval] double* ret);
+
 		// methods must match HelloWorldControl's public methods 
 		HRESULT Add(double left, double right, [out, retval] double* ret);
 	};

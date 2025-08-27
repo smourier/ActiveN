@@ -28,7 +28,17 @@ public partial class HelloWorldControl : BaseControl, IHelloWorldControl
     }
 
     // COM visible public properties exposed through IHelloWorldControl IDL should go here
-    public DateTime CurrentDateTime => DateTime.Now;
+    public HRESULT CurrentDateTime(out double ret)
+    {
+        ret = DateTime.Now.ToOADate();
+        return Constants.S_OK;
+    }
+
+    public HRESULT HWND(out nint ret)
+    {
+        ret = GetWindowHandle();
+        return Constants.S_OK;
+    }
 
     // this is not in the IDL, but it works (automatic dispid)
     public long TickCount => Environment.TickCount64;
@@ -40,7 +50,6 @@ public partial class HelloWorldControl : BaseControl, IHelloWorldControl
         return $"Hello from ActiveN HelloWorldControl! Date is {DateTime.Now}.";
     });
 
-
     // this would be valid too: public double ComputePi()
     public HRESULT ComputePi(out double ret)
     {
@@ -50,7 +59,12 @@ public partial class HelloWorldControl : BaseControl, IHelloWorldControl
     }
 
     // this would be valid too: public HRESULT ComputePi(double left, double right, out double sum)
-    public double Add(double left, double right) => left + right;
+    public HRESULT Add(double left, double right, out double sum)
+    {
+        sum = left + right;
+        ComRegistration.Trace();
+        return Constants.S_OK;
+    }
 
     // COM registration
     public static new HRESULT RegisterType(ComRegistrationContext context)
