@@ -24,7 +24,7 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
             if (typeLib != null)
             {
                 var hr = typeLib.Object.GetTypeInfoOfGuid(GetType().GUID, out var ti);
-                ComRegistration.Trace($"GetTypeInfoOfGuid: {GetType().GUID:B} hr:{hr}");
+                TracingUtilities.Trace($"GetTypeInfoOfGuid: {GetType().GUID:B} hr:{hr}");
                 _typeInfo = ti != null ? new ComObject<ITypeInfo>(ti) : null;
             }
             _typeInfoLoaded = true;
@@ -74,7 +74,7 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
                 continue;
             }
 
-            ComRegistration.Trace($"name '{name}'");
+            TracingUtilities.Trace($"name '{name}'");
 
             if (!_cache.TryGetValue(type, out var dispatchType))
             {
@@ -104,7 +104,7 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
             {
                 rgDispId[i] = -1;
             }
-            ComRegistration.Trace($"name '{name}' => {rgDispId[i]} (0x{rgDispId[i]:X8})");
+            TracingUtilities.Trace($"name '{name}' => {rgDispId[i]} (0x{rgDispId[i]:X8})");
         }
 
         if (rgDispId.Any(id => id == -1))
@@ -120,22 +120,22 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
     {
         try
         {
-            ComRegistration.Trace($"dispIdMember: {dispIdMember} wFlags: {wFlags} cArgs: {pDispParams.cArgs} pVarResult: {pVarResult} pExcepInfo: {pExcepInfo} puArgErr: {puArgErr}");
+            TracingUtilities.Trace($"dispIdMember: {dispIdMember} wFlags: {wFlags} cArgs: {pDispParams.cArgs} pVarResult: {pVarResult} pExcepInfo: {pExcepInfo} puArgErr: {puArgErr}");
             var type = GetType();
             // note we can return DISP_E_MEMBERNOTFOUND for a method/property that exists in the TLB but not in the actual type
             if (!_cache.TryGetValue(type, out var dispatchType) || dispatchType.GetMemberInfo(dispIdMember) is not MemberInfo member)
             {
-                ComRegistration.Trace($"dispIdMember: {dispIdMember} was not found => DISP_E_MEMBERNOTFOUND.");
+                TracingUtilities.Trace($"dispIdMember: {dispIdMember} was not found => DISP_E_MEMBERNOTFOUND.");
                 return Constants.DISP_E_MEMBERNOTFOUND;
             }
 
-            ComRegistration.Trace($"member: {member.Name} ({member.MemberType})");
+            TracingUtilities.Trace($"member: {member.Name} ({member.MemberType})");
             if (member is PropertyInfo property)
             {
                 if (wFlags.HasFlag(DISPATCH_FLAGS.DISPATCH_PROPERTYGET))
                 {
                     var value = property.GetValue(this);
-                    ComRegistration.Trace($"get value: {value}");
+                    TracingUtilities.Trace($"get value: {value}");
                     if (pVarResult != 0)
                     {
                         using var v = new Variant(value);
@@ -169,7 +169,7 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
                         hasOutRetval = arguments.Length == (pDispParams.cArgs + 1) && arguments[^1].Attributes.HasFlag(ParameterAttributes.Out);
                         if (!hasOutRetval)
                         {
-                            ComRegistration.Trace($"member: {member.Name} expected parameters count {arguments.Length}, provided {pDispParams.cArgs} : => DISP_E_BADPARAMCOUNT.");
+                            TracingUtilities.Trace($"member: {member.Name} expected parameters count {arguments.Length}, provided {pDispParams.cArgs} : => DISP_E_BADPARAMCOUNT.");
                             return Constants.DISP_E_BADPARAMCOUNT;
                         }
                     }
@@ -277,7 +277,7 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
         }
         catch (Exception ex)
         {
-            ComRegistration.Trace($"Exception: {ex}");
+            TracingUtilities.Trace($"Exception: {ex}");
             if (pExcepInfo != 0)
             {
                 var excepInfo = new EXCEPINFO
@@ -294,7 +294,7 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
 
     HRESULT IDispatch.GetTypeInfo(uint iTInfo, uint lcid, out ITypeInfo ppTInfo)
     {
-        ComRegistration.Trace($"iTInfo {iTInfo}");
+        TracingUtilities.Trace($"iTInfo {iTInfo}");
         ppTInfo = null!;
         var ti = EnsureTypeInfo();
         if (ti != null)
@@ -312,7 +312,7 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
     {
         var ti = EnsureTypeInfo();
         pctinfo = ti != null ? 1u : 0u;
-        ComRegistration.Trace($"pctinfo {pctinfo}");
+        TracingUtilities.Trace($"pctinfo {pctinfo}");
         return ti != null ? Constants.S_OK : Constants.E_NOTIMPL;
     }
 
@@ -361,7 +361,7 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
                     continue;
 
                 var typeName = TypeLib.GetName(obj, -1);
-                ComRegistration.Trace($"type: '{typeName}'");
+                TracingUtilities.Trace($"type: '{typeName}'");
 
                 using var refTypeInfo = new ComObject<ITypeInfo>(obj);
                 var refTypeAttr = TypeLib.GetAttributes(refTypeInfo.Object);
@@ -379,7 +379,7 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
                         continue;
 
                     var name = TypeLib.GetName(refTypeInfo.Object, funcDesc.Value.memid);
-                    ComRegistration.Trace($"funcDesc: id:{funcDesc.Value.memid} name:'{name}' kind:{funcDesc.Value.funckind} invkind:{funcDesc.Value.invkind} params:{funcDesc.Value.cParams} paramsOpt:{funcDesc.Value.cParamsOpt} flags:{funcDesc.Value.wFuncFlags}");
+                    TracingUtilities.Trace($"funcDesc: id:{funcDesc.Value.memid} name:'{name}' kind:{funcDesc.Value.funckind} invkind:{funcDesc.Value.invkind} params:{funcDesc.Value.cParams} paramsOpt:{funcDesc.Value.cParamsOpt} flags:{funcDesc.Value.wFuncFlags}");
                     if (name == null)
                         continue;
 
@@ -425,12 +425,12 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
 #if DEBUG
             foreach (var kv in _memberByDispIds)
             {
-                ComRegistration.Trace($"dispid: {kv.Key} => {kv.Value}");
+                TracingUtilities.Trace($"dispid: {kv.Key} => {kv.Value}");
             }
 
             foreach (var kv in _membersByName)
             {
-                ComRegistration.Trace($"name: '{kv.Key}' => {kv.Value}");
+                TracingUtilities.Trace($"name: '{kv.Key}' => {kv.Value}");
             }
 #endif
         }

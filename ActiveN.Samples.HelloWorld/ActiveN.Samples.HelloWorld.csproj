@@ -60,6 +60,7 @@
 	<ItemGroup>
 		<Using Include="ActiveN" />
 		<Using Include="ActiveN.Hosting" />
+		<Using Include="ActiveN.Utilities" />
 		<Using Include="DirectN" />
 		<Using Include="DirectN.Extensions" />
 		<Using Include="DirectN.Extensions.Com" />

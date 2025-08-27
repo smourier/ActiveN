@@ -40,7 +40,7 @@ public partial class HelloWorldControl : BaseControl, IHelloWorldControl
         return Constants.S_OK;
     }
 
-    // this is not in the IDL, but it works (automatic dispid)
+    // this is not in the IDL, but it works (IDispatch + automatic dispid)
     public long TickCount => Environment.TickCount64;
 
     // COM visible public methods exposed through IHelloWorldControl IDL should go here
@@ -54,7 +54,7 @@ public partial class HelloWorldControl : BaseControl, IHelloWorldControl
     public HRESULT ComputePi(out double ret)
     {
         ret = Math.PI;
-        ComRegistration.Trace();
+        TracingUtilities.Trace();
         return Constants.S_OK;
     }
 
@@ -62,20 +62,20 @@ public partial class HelloWorldControl : BaseControl, IHelloWorldControl
     public HRESULT Add(double left, double right, out double sum)
     {
         sum = left + right;
-        ComRegistration.Trace();
+        TracingUtilities.Trace();
         return Constants.S_OK;
     }
 
     // COM registration
     public static new HRESULT RegisterType(ComRegistrationContext context)
     {
-        ComRegistration.Trace($"Register type {typeof(HelloWorldControl).FullName}...");
+        TracingUtilities.Trace($"Register type {typeof(HelloWorldControl).FullName}...");
         return BaseControl.RegisterType(context);
     }
 
     public static new HRESULT UnregisterType(ComRegistrationContext context)
     {
-        ComRegistration.Trace($"Unregister type {typeof(HelloWorldControl).FullName}...");
+        TracingUtilities.Trace($"Unregister type {typeof(HelloWorldControl).FullName}...");
         return BaseControl.UnregisterType(context);
     }
 }

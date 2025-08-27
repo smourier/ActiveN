@@ -1,10 +1,18 @@
-﻿namespace ActiveN;
+﻿using IServiceProvider = DirectN.IServiceProvider;
+
+namespace ActiveN;
 
 [GeneratedComClass]
 public abstract partial class BaseControl : BaseDispatch,
     IOleObject,
     IOleControl,
     IOleWindow,
+    IDataObject,
+    IObjectWithSite,
+    IOleInPlaceActiveObject,
+    IOleInPlaceObject,
+    IQuickActivate,
+    IServiceProvider,
     IProvideClassInfo,
     IPersistStreamInit,
     IViewObject2,
@@ -22,7 +30,7 @@ public abstract partial class BaseControl : BaseDispatch,
 
     protected BaseControl()
     {
-        ComRegistration.Trace($"Created {GetType().FullName} ({GetType().GUID:B})");
+        TracingUtilities.Trace($"Created {GetType().FullName} ({GetType().GUID:B})");
         Functions.CreateOleAdviseHolder(out var obj).ThrowOnError();
         _adviseHolder = new ComObject<IOleAdviseHolder>(obj);
     }
@@ -50,21 +58,22 @@ public abstract partial class BaseControl : BaseDispatch,
     protected virtual CustomQueryInterfaceResult GetInterface(ref Guid iid, out nint ppv)
     {
         ppv = 0;
-        // don't log these
-        if (iid == typeof(IOleLink).GUID || iid == typeof(IPersistStorage).GUID)
-            return CustomQueryInterfaceResult.NotHandled;
+        //// don't log these
+        //if (iid == typeof(IOleLink).GUID || iid == typeof(IPersistStorage).GUID)
+        //    return CustomQueryInterfaceResult.NotHandled;
 
-        // keep an eye on these
-        if (iid == typeof(IRunnableObject).GUID)
-        {
-            ComRegistration.Trace(typeof(IRunnableObject).Name);
-        }
-        else if (iid != typeof(IOleObject).GUID && iid != typeof(IProvideClassInfo).GUID && iid != typeof(IOleObject).GUID &&
-            iid != typeof(IPersistStreamInit).GUID && iid != typeof(IViewObject2).GUID && iid != typeof(IViewObjectEx).GUID &&
-            iid != typeof(IOleControl).GUID && iid != typeof(IPointerInactive).GUID)
-        {
-            ComRegistration.Trace($"GetInterface: {iid:B}");
-        }
+        //// keep an eye on these
+        //if (iid == typeof(IRunnableObject).GUID)
+        //{
+        //    TracingUtilities.Trace(typeof(IRunnableObject).Name);
+        //}
+        //else if (iid != typeof(IOleObject).GUID && iid != typeof(IProvideClassInfo).GUID && iid != typeof(IOleObject).GUID &&
+        //    iid != typeof(IPersistStreamInit).GUID && iid != typeof(IViewObject2).GUID && iid != typeof(IViewObjectEx).GUID &&
+        //    iid != typeof(IOleControl).GUID && iid != typeof(IPointerInactive).GUID)
+        //{
+        //    TracingUtilities.Trace($"GetInterface: {GuidNames.GetInterfaceIdName(iid)}");
+        //}
+        TracingUtilities.Trace($"GetInterface: {iid.GetName()}");
         return CustomQueryInterfaceResult.NotHandled;
     }
 
@@ -85,7 +94,7 @@ public abstract partial class BaseControl : BaseDispatch,
     protected static HRESULT RegisterType(ComRegistrationContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        ComRegistration.Trace($"Register type {typeof(BaseControl).FullName}...");
+        TracingUtilities.Trace($"Register type {typeof(BaseControl).FullName}...");
 
         // add the "Control" subkey to indicate that this is an ActiveX control
         using var key = ComRegistration.EnsureWritableSubKey(context.RegistryRoot, Path.Combine(ComRegistration.ClsidRegistryKey, context.GUID.ToString("B")));
@@ -130,13 +139,13 @@ public abstract partial class BaseControl : BaseDispatch,
     protected static HRESULT UnregisterType(ComRegistrationContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        ComRegistration.Trace($"Unregister type {typeof(BaseControl).FullName}...");
+        TracingUtilities.Trace($"Unregister type {typeof(BaseControl).FullName}...");
         return Constants.S_OK;
     }
 
     protected virtual HRESULT NotImplemented([CallerMemberName] string? methodName = null, [CallerFilePath] string? filePath = null)
     {
-        ComRegistration.Trace($"E_NOIMPL", methodName, filePath);
+        TracingUtilities.Trace($"E_NOIMPL", methodName, filePath);
         return Constants.E_NOTIMPL;
     }
 
@@ -144,20 +153,20 @@ public abstract partial class BaseControl : BaseDispatch,
     {
         _clientSite?.Dispose();
         _clientSite = pClientSite != null ? new ComObject<IOleClientSite>(pClientSite) : null;
-        ComRegistration.Trace($"Site: {pClientSite}");
+        TracingUtilities.Trace($"Site: {pClientSite}");
         return Constants.S_OK;
     }
 
     HRESULT IOleObject.GetClientSite(out IOleClientSite ppClientSite)
     {
         ppClientSite = _clientSite?.Object!;
-        ComRegistration.Trace($"Site: {ppClientSite}");
+        TracingUtilities.Trace($"Site: {ppClientSite}");
         return Constants.S_OK;
     }
 
     HRESULT IOleObject.SetHostNames(PWSTR szContainerApp, PWSTR szContainerObj)
     {
-        ComRegistration.Trace($"szContainerApp: '{szContainerApp}' szContainerObj: '{szContainerObj}'");
+        TracingUtilities.Trace($"szContainerApp: '{szContainerApp}' szContainerObj: '{szContainerObj}'");
         return Constants.S_OK;
     }
 
@@ -171,10 +180,10 @@ public abstract partial class BaseControl : BaseDispatch,
 
     HRESULT IOleObject.GetClipboardData(uint dwReserved, out IDataObject ppDataObject) { ppDataObject = null!; return NotImplemented(); }
 
-    HRESULT IOleObject.DoVerb(int iVerb, in MSG lpmsg, IOleClientSite pActiveSite, int lindex, HWND hwndParent, in RECT lprcPosRect)
+    HRESULT IOleObject.DoVerb(int iVerb, nint lpmsg, IOleClientSite pActiveSite, int lindex, HWND hwndParent, nint lprcPosRect)
     {
         var verb = (OLEIVERB)iVerb;
-        ComRegistration.Trace($"iVerb: {verb} lpmsg: {MessageDecoder.Decode(lpmsg)} pActiveSite: {pActiveSite} lindex: {lindex} hwndParent: {hwndParent} lprcPosRect: {lprcPosRect}");
+        TracingUtilities.Trace($"iVerb: {verb} lpmsg: {lpmsg} pActiveSite: {pActiveSite} lindex: {lindex} hwndParent: {hwndParent} lprcPosRect: {lprcPosRect}");
         return Constants.S_OK;
     }
 
@@ -203,21 +212,21 @@ public abstract partial class BaseControl : BaseDispatch,
     HRESULT IOleObject.Advise(IAdviseSink pAdvSink, out uint pdwConnection)
     {
         var hr = _adviseHolder.Object.Advise(pAdvSink, out pdwConnection);
-        ComRegistration.Trace($"dwConnection {pdwConnection}: {hr}");
+        TracingUtilities.Trace($"dwConnection {pdwConnection}: {hr}");
         return hr;
     }
 
     HRESULT IOleObject.Unadvise(uint dwConnection)
     {
         var hr = _adviseHolder.Object.Unadvise(dwConnection);
-        ComRegistration.Trace($"dwConnection {dwConnection}: {hr}");
+        TracingUtilities.Trace($"dwConnection {dwConnection}: {hr}");
         return hr;
     }
 
     HRESULT IOleObject.EnumAdvise(out IEnumSTATDATA ppenumAdvise)
     {
         var hr = _adviseHolder.Object.EnumAdvise(out ppenumAdvise);
-        ComRegistration.Trace($"ppenumAdvise {ppenumAdvise}: {hr}");
+        TracingUtilities.Trace($"ppenumAdvise {ppenumAdvise}: {hr}");
         return hr;
     }
 
@@ -234,7 +243,7 @@ public abstract partial class BaseControl : BaseDispatch,
     {
         var ti = EnsureTypeInfo();
         ppTI = ti != null ? ti.Object : null!;
-        ComRegistration.Trace($"ppTI {ppTI}");
+        TracingUtilities.Trace($"ppTI {ppTI}");
         return ti != null ? Constants.S_OK : Constants.E_UNEXPECTED;
     }
 
@@ -242,7 +251,7 @@ public abstract partial class BaseControl : BaseDispatch,
 
     HRESULT IPersistStreamInit.Load(IStream pStm)
     {
-        ComRegistration.Trace($"pStm {pStm}");
+        TracingUtilities.Trace($"pStm {pStm}");
         _isDirty = false;
         return Constants.S_OK;
     }
@@ -250,7 +259,7 @@ public abstract partial class BaseControl : BaseDispatch,
     HRESULT IPersistStreamInit.Save(IStream pStm, BOOL fClearDirty)
     {
         _isDirty = !fClearDirty;
-        ComRegistration.Trace($"pStm {pStm} fClearDirty:{fClearDirty}");
+        TracingUtilities.Trace($"pStm {pStm} fClearDirty:{fClearDirty}");
         return Constants.S_OK;
     }
 
@@ -259,21 +268,21 @@ public abstract partial class BaseControl : BaseDispatch,
     HRESULT IPersistStreamInit.InitNew()
     {
         _isDirty = true;
-        ComRegistration.Trace();
+        TracingUtilities.Trace();
         return Constants.S_OK;
     }
 
     HRESULT IPersist.GetClassID(out Guid pClassID)
     {
         pClassID = GetType().GUID;
-        ComRegistration.Trace();
+        TracingUtilities.Trace();
         return Constants.S_OK;
     }
 
     HRESULT IViewObject2.GetExtent(DVASPECT dwDrawAspect, int lindex, in DVTARGETDEVICE ptd, out SIZE lpsizel) { lpsizel = new(); return NotImplemented(); }
     HRESULT IViewObject.Draw(DVASPECT dwDrawAspect, int lindex, nint pvAspect, nint ptd, HDC hdcTargetDev, HDC hdcDraw, nint lprcBounds, nint lprcWBounds, nint pfnContinue, nuint dwContinue)
     {
-        ComRegistration.Trace($"dwDrawAspect: {dwDrawAspect} lindex: {lindex} pvAspect: {pvAspect} ptd: {ptd} hdcTargetDev: {hdcTargetDev} hdcDraw: {hdcDraw} lprcBounds: {lprcBounds} lprcWBounds: {lprcWBounds} pfnContinue: {pfnContinue} dwContinue: {dwContinue}");
+        TracingUtilities.Trace($"dwDrawAspect: {dwDrawAspect} lindex: {lindex} pvAspect: {pvAspect} ptd: {ptd} hdcTargetDev: {hdcTargetDev} hdcDraw: {hdcDraw} lprcBounds: {lprcBounds} lprcWBounds: {lprcWBounds} pfnContinue: {pfnContinue} dwContinue: {dwContinue}");
         return Constants.S_OK;
     }
 
@@ -284,14 +293,14 @@ public abstract partial class BaseControl : BaseDispatch,
     {
         _adviseSink?.Dispose();
         _adviseSink = pAdvSink != null ? new ComObject<IAdviseSink>(pAdvSink) : null;
-        ComRegistration.Trace($"Sink: {pAdvSink}");
+        TracingUtilities.Trace($"Sink: {pAdvSink}");
         return Constants.S_OK;
     }
 
     HRESULT IViewObject.GetAdvise(nint pAspects, nint pAdvf, out IAdviseSink ppAdvSink)
     {
         ppAdvSink = _adviseSink?.Object!;
-        ComRegistration.Trace($"Site: {ppAdvSink}");
+        TracingUtilities.Trace($"Site: {ppAdvSink}");
         return Constants.S_OK;
     }
 
@@ -300,25 +309,25 @@ public abstract partial class BaseControl : BaseDispatch,
     {
         var status = VIEWSTATUS.VIEWSTATUS_OPAQUE;
         pdwStatus = (uint)status;
-        ComRegistration.Trace($"pdwStatus: {status}");
+        TracingUtilities.Trace($"pdwStatus: {status}");
         return Constants.S_OK;
     }
 
     HRESULT IViewObjectEx.QueryHitPoint(uint dwAspect, in RECT pRectBounds, POINT ptlLoc, int lCloseHint, out uint pHitResult)
     {
         var aspect = (DVASPECT)dwAspect;
-        //ComRegistration.Trace($"dwAspect: {aspect} pRectBounds: {pRectBounds} ptlLoc: {ptlLoc} lCloseHint: {lCloseHint}");
+        //TracingUtilities.Trace($"dwAspect: {aspect} pRectBounds: {pRectBounds} ptlLoc: {ptlLoc} lCloseHint: {lCloseHint}");
 
         if (aspect == DVASPECT.DVASPECT_CONTENT)
         {
             var result = Functions.PtInRect(pRectBounds, ptlLoc) ? TXTHITRESULT.TXTHITRESULT_HIT : TXTHITRESULT.TXTHITRESULT_NOHIT;
-            //ComRegistration.Trace($"pHitResult: {result}");
+            //TracingUtilities.Trace($"pHitResult: {result}");
             pHitResult = (uint)result;
             return Constants.S_OK;
         }
 
         pHitResult = 0;
-        ComRegistration.Trace($"E_FAIL");
+        TracingUtilities.Trace($"E_FAIL");
         return Constants.E_FAIL;
     }
 
@@ -328,38 +337,38 @@ public abstract partial class BaseControl : BaseDispatch,
     HRESULT IOleControl.GetControlInfo(ref CONTROLINFO pCI) { pCI = new(); return NotImplemented(); }
     HRESULT IOleControl.OnMnemonic(in MSG pMsg)
     {
-        ComRegistration.Trace($"pMSg: {MessageDecoder.Decode(pMsg)}");
+        TracingUtilities.Trace($"pMSg: {MessageDecoder.Decode(pMsg)}");
         return Constants.S_OK;
     }
 
     HRESULT IOleControl.OnAmbientPropertyChange(int dispID)
     {
-        ComRegistration.Trace($"dispID: {dispID}");
+        TracingUtilities.Trace($"dispID: {dispID}");
         return Constants.S_OK;
     }
 
     HRESULT IOleControl.FreezeEvents(BOOL bFreeze)
     {
-        ComRegistration.Trace($"bFreeze: {bFreeze}");
+        TracingUtilities.Trace($"bFreeze: {bFreeze}");
         return Constants.S_OK;
     }
 
     HRESULT IPointerInactive.GetActivationPolicy(out POINTERINACTIVE pdwPolicy)
     {
         pdwPolicy = PointerActivationPolicy;
-        ComRegistration.Trace($"pdwPolicy: {pdwPolicy}");
+        TracingUtilities.Trace($"pdwPolicy: {pdwPolicy}");
         return Constants.S_OK;
     }
 
     HRESULT IPointerInactive.OnInactiveMouseMove(in RECT pRectBounds, int x, int y, uint grfKeyState)
     {
-        ComRegistration.Trace($"pRectBounds: {pRectBounds} x: {x} y: {y} grfKeyState:{grfKeyState}");
+        TracingUtilities.Trace($"pRectBounds: {pRectBounds} x: {x} y: {y} grfKeyState:{grfKeyState}");
         return Constants.S_OK;
     }
 
     HRESULT IPointerInactive.OnInactiveSetCursor(in RECT pRectBounds, int x, int y, uint dwMouseMsg, BOOL fSetAlways)
     {
-        ComRegistration.Trace($"pRectBounds: {pRectBounds} x: {x} y: {y} dwMouseMsg:{dwMouseMsg} fSetAlways:{fSetAlways}");
+        TracingUtilities.Trace($"pRectBounds: {pRectBounds} x: {x} y: {y} dwMouseMsg:{dwMouseMsg} fSetAlways:{fSetAlways}");
         return Constants.S_OK;
     }
 
@@ -367,7 +376,7 @@ public abstract partial class BaseControl : BaseDispatch,
     {
         pPages.pElems = 0;
         pPages.cElems = 0;
-        ComRegistration.Trace($"cElems: {pPages.cElems}");
+        TracingUtilities.Trace($"cElems: {pPages.cElems}");
         return Constants.S_OK;
     }
 
@@ -388,8 +397,128 @@ public abstract partial class BaseControl : BaseDispatch,
     HRESULT IOleWindow.GetWindow(out HWND phwnd)
     {
         phwnd = GetWindowHandle();
-        ComRegistration.Trace($"phwnd: {phwnd}");
+        TracingUtilities.Trace($"phwnd: {phwnd}");
         return Constants.S_OK;
+    }
+
+    HRESULT IDataObject.GetData(in FORMATETC pformatetcIn, out STGMEDIUM pmedium)
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IDataObject.GetDataHere(in FORMATETC pformatetc, ref STGMEDIUM pmedium)
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IDataObject.QueryGetData(in FORMATETC pformatetc)
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IDataObject.GetCanonicalFormatEtc(in FORMATETC pformatectIn, out FORMATETC pformatetcOut)
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IDataObject.SetData(in FORMATETC pformatetc, in STGMEDIUM pmedium, BOOL fRelease)
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IDataObject.EnumFormatEtc(uint dwDirection, out IEnumFORMATETC ppenumFormatEtc)
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IDataObject.DAdvise(in FORMATETC pformatetc, uint advf, IAdviseSink pAdvSink, out uint pdwConnection)
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IDataObject.DUnadvise(uint dwConnection)
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IDataObject.EnumDAdvise(out IEnumSTATDATA ppenumAdvise)
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IObjectWithSite.SetSite(nint pUnkSite)
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IObjectWithSite.GetSite(in Guid riid, out nint ppvSite)
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IOleInPlaceActiveObject.TranslateAccelerator(nint lpmsg)
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IOleInPlaceActiveObject.OnFrameWindowActivate(BOOL fActivate)
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IOleInPlaceActiveObject.OnDocWindowActivate(BOOL fActivate)
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IOleInPlaceActiveObject.ResizeBorder(in RECT prcBorder, IOleInPlaceUIWindow pUIWindow, BOOL fFrameWindow)
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IOleInPlaceActiveObject.EnableModeless(BOOL fEnable)
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IOleInPlaceObject.InPlaceDeactivate()
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IOleInPlaceObject.UIDeactivate()
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IOleInPlaceObject.SetObjectRects(in RECT lprcPosRect, in RECT lprcClipRect)
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IOleInPlaceObject.ReactivateAndUndo()
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IQuickActivate.QuickActivate(in QACONTAINER pQaContainer, ref QACONTROL pQaControl)
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IQuickActivate.SetContentExtent(in SIZE pSizel)
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IQuickActivate.GetContentExtent(out SIZE pSizel)
+    {
+        throw new NotImplementedException();
+    }
+
+    HRESULT IServiceProvider.QueryService(in Guid guidService, in Guid riid, out nint ppvObject)
+    {
+        throw new NotImplementedException();
     }
 
     [GeneratedComClass]

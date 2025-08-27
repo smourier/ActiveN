@@ -21,7 +21,6 @@ library ActiveNSamplesHelloWorldLib
 		nonextensible,
 		pointer_default(unique),
 		helpstring("IHelloWorldControl Interface"),
-		oleautomation,
 	]
 	interface IHelloWorldControl : IDispatch
 	{
