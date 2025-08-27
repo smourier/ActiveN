@@ -1,5 +1,4 @@
-﻿
-namespace ActiveN.Samples.HelloWorld;
+﻿namespace ActiveN.Samples.HelloWorld;
 
 // TODO: generate another GUID, change ProgId and DisplayName
 // This GUID *must* match the one in the corresponding .idl coclass
@@ -8,10 +7,52 @@ namespace ActiveN.Samples.HelloWorld;
 [DisplayName("ActiveN Hello World Control")]
 [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)]
 [GeneratedComClass]
+#pragma warning disable CA1822 // Mark members as static; no since we're dealing with COM instance methods & properties
 public partial class HelloWorldControl : BaseControl, IHelloWorldControl
 {
     protected override ComRegistration ComRegistration => ComHosting.Instance;
+    protected override HWND GetWindowHandle()
+    {
+        throw new NotImplementedException();
+    }
 
+    // note this is necesary to avoid trimming Task<T>.Result for AOT publishing
+    // all Task<T> results should be unwrapped here
+    // so you can return any type needed by public methods and properties returning Tasks
+    protected override object? GetTaskResult(Task task)
+    {
+        if (task is Task<string> s)
+            return s.Result;
+
+        return null;
+    }
+
+    // COM visible public properties exposed through IHelloWorldControl IDL should go here
+    public DateTime CurrentDateTime => DateTime.Now;
+
+    // this is not in the IDL, but it works (automatic dispid)
+    public long TickCount => Environment.TickCount64;
+
+    // COM visible public methods exposed through IHelloWorldControl IDL should go here
+    public Task<string> GetInfoAsync(int delay) => Task.Run(async () =>
+    {
+        await Task.Delay(delay).ConfigureAwait(false); // simulate some async work
+        return $"Hello from ActiveN HelloWorldControl! Date is {DateTime.Now}.";
+    });
+
+
+    // this would be valid too: public double ComputePi()
+    public HRESULT ComputePi(out double ret)
+    {
+        ret = Math.PI;
+        ComRegistration.Trace();
+        return Constants.S_OK;
+    }
+
+    // this would be valid too: public HRESULT ComputePi(double left, double right, out double sum)
+    public double Add(double left, double right) => left + right;
+
+    // COM registration
     public static new HRESULT RegisterType(ComRegistrationContext context)
     {
         ComRegistration.Trace($"Register type {typeof(HelloWorldControl).FullName}...");
@@ -23,35 +64,5 @@ public partial class HelloWorldControl : BaseControl, IHelloWorldControl
         ComRegistration.Trace($"Unregister type {typeof(HelloWorldControl).FullName}...");
         return BaseControl.UnregisterType(context);
     }
-
-    public HRESULT ComputePi(out double ret)
-    {
-        ret = Math.PI;
-        ComRegistration.Trace();
-        return Constants.S_OK;
-    }
-
-    public HRESULT GetIDsOfNames(in Guid riid, PWSTR[] rgszNames, uint cNames, uint lcid, int[] rgDispId)
-    {
-        ComRegistration.Trace();
-        throw new NotImplementedException();
-    }
-
-    public HRESULT GetTypeInfo(uint iTInfo, uint lcid, out ITypeInfo ppTInfo)
-    {
-        ComRegistration.Trace();
-        throw new NotImplementedException();
-    }
-
-    public HRESULT GetTypeInfoCount(out uint pctinfo)
-    {
-        ComRegistration.Trace();
-        throw new NotImplementedException();
-    }
-
-    public HRESULT Invoke(int dispIdMember, in Guid riid, uint lcid, DISPATCH_FLAGS wFlags, in DISPPARAMS pDispParams, nint pVarResult, nint pExcepInfo, nint puArgErr)
-    {
-        ComRegistration.Trace();
-        throw new NotImplementedException();
-    }
 }
+#pragma warning restore CA1822 // Mark members as static

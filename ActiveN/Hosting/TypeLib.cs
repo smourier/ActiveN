@@ -107,4 +107,52 @@ public sealed class TypeLib
         if (doc.Value != 0) BSTR.Dispose(ref doc);
         return info;
     }
+
+    public static unsafe TYPEATTR? GetAttributes(ITypeInfo? typeInfo)
+    {
+        if (typeInfo == null)
+            return null;
+
+        if (typeInfo.GetTypeAttr(out var ptr).IsError || ptr == 0)
+            return null;
+
+        try
+        {
+            return *(TYPEATTR*)ptr;
+        }
+        finally
+        {
+            typeInfo.ReleaseTypeAttr(ptr);
+        }
+    }
+
+    public static unsafe string? GetName(ITypeInfo? typeInfo, int memid)
+    {
+        if (typeInfo == null)
+            return null;
+
+        BSTR bstr;
+        typeInfo.GetDocumentation(memid, (nint)(&bstr), 0, out _, 0);
+        var name = bstr.ToString();
+        if (bstr.Value != 0) BSTR.Dispose(ref bstr);
+        return name;
+    }
+
+    public static unsafe FUNCDESC? GetFuncDesc(ITypeInfo? typeInfo, uint index)
+    {
+        if (typeInfo == null)
+            return null;
+
+        if (typeInfo.GetFuncDesc(index, out var ptr).IsError || ptr == 0)
+            return null;
+
+        try
+        {
+            return *(FUNCDESC*)ptr;
+        }
+        finally
+        {
+            typeInfo.ReleaseFuncDesc(ptr);
+        }
+    }
 }

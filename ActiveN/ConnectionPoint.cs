@@ -95,6 +95,29 @@ public partial class ConnectionPoint : IConnectionPoint, IDisposable
         return Constants.S_OK;
     }
 
+    public void Dispose() { Dispose(disposing: true); GC.SuppressFinalize(this); }
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            foreach (var kv in _sinks)
+            {
+                try
+                {
+                    kv.Value.Dispose();
+                }
+                catch
+                {
+                    // continue
+                }
+            }
+            // dispose managed state (managed objects)
+        }
+
+        // free unmanaged resources (unmanaged objects) and override finalizer
+        // set large fields to null
+    }
+
     [GeneratedComClass]
     private sealed partial class Connections(KeyValuePair<uint, IComObject<IDispatch>>[] connections) : IEnumConnections
     {
@@ -134,29 +157,5 @@ public partial class ConnectionPoint : IConnectionPoint, IDisposable
             return (max == count) ? Constants.S_OK : Constants.S_FALSE;
         }
     }
-
-    protected virtual void Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            foreach (var kv in _sinks)
-            {
-                try
-                {
-                    kv.Value.Dispose();
-                }
-                catch
-                {
-                    // continue
-                }
-            }
-            // dispose managed state (managed objects)
-        }
-
-        // free unmanaged resources (unmanaged objects) and override finalizer
-        // set large fields to null
-    }
-
-    public void Dispose() { Dispose(disposing: true); GC.SuppressFinalize(this); }
 }
 

@@ -34,6 +34,7 @@
 		<Using Include="System.Runtime.Versioning" />
 		<Using Include="System.Security" />
 		<Using Include="System.Threading" />
+		<Using Include="System.Threading.Tasks" />
 	</ItemGroup>
 
 	<ItemGroup>

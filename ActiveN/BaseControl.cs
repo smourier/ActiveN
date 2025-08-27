@@ -1,9 +1,10 @@
 ﻿namespace ActiveN;
 
 [GeneratedComClass]
-public abstract partial class BaseControl : IDisposable,
+public abstract partial class BaseControl : BaseDispatch,
     IOleObject,
     IOleControl,
+    IOleWindow,
     IProvideClassInfo,
     IPersistStreamInit,
     IViewObject2,
@@ -17,9 +18,6 @@ public abstract partial class BaseControl : IDisposable,
     private readonly ComObject<IOleAdviseHolder> _adviseHolder;
     private ComObject<IOleClientSite>? _clientSite;
     private ComObject<IAdviseSink>? _adviseSink;
-    private ComObject<ITypeInfo>? _typeInfo;
-    private bool _typeInfoLoaded;
-    private bool _disposedValue;
     private bool _isDirty;
 
     protected BaseControl()
@@ -29,10 +27,8 @@ public abstract partial class BaseControl : IDisposable,
         _adviseHolder = new ComObject<IOleAdviseHolder>(obj);
     }
 
-    protected abstract ComRegistration ComRegistration { get; }
-
-    public virtual POINTERINACTIVE PointerActivationPolicy => POINTERINACTIVE.POINTERINACTIVE_ACTIVATEONENTRY;
-    public virtual OLEMISC MiscStatus => OLEMISC.OLEMISC_RECOMPOSEONRESIZE | OLEMISC.OLEMISC_CANTLINKINSIDE | OLEMISC.OLEMISC_INSIDEOUT | OLEMISC.OLEMISC_ACTIVATEWHENVISIBLE | OLEMISC.OLEMISC_SETCLIENTSITEFIRST;
+    protected virtual POINTERINACTIVE PointerActivationPolicy => POINTERINACTIVE.POINTERINACTIVE_ACTIVATEONENTRY;
+    protected virtual OLEMISC MiscStatus => OLEMISC.OLEMISC_RECOMPOSEONRESIZE | OLEMISC.OLEMISC_CANTLINKINSIDE | OLEMISC.OLEMISC_INSIDEOUT | OLEMISC.OLEMISC_ACTIVATEWHENVISIBLE | OLEMISC.OLEMISC_SETCLIENTSITEFIRST;
 
     protected virtual void AddConnectionPoint(IConnectionPoint connectionPoint)
     {
@@ -48,23 +44,6 @@ public abstract partial class BaseControl : IDisposable,
         connectionPoint.GetConnectionInterface(out var iid).ThrowOnError();
         if (!_connectionPoints.TryAdd(iid, connectionPoint))
             throw new ArgumentException($"Connection point with iid {iid} is already registered", nameof(connectionPoint));
-    }
-
-    protected virtual ComObject<ITypeInfo>? EnsureTypeInfo()
-    {
-        if (!_typeInfoLoaded)
-        {
-            var reg = ComRegistration ?? throw new InvalidOperationException("ComRegistration is not set");
-            using var typeLib = TypeLib.LoadTypeLib(reg.DllPath, throwOnError: false);
-            if (typeLib != null)
-            {
-                var hr = typeLib.Object.GetTypeInfoOfGuid(GetType().GUID, out var ti);
-                ComRegistration.Trace($"GetTypeInfoOfGuid: {GetType().GUID:B} hr:{hr}");
-                _typeInfo = ti != null ? new ComObject<ITypeInfo>(ti) : null;
-            }
-            _typeInfoLoaded = true;
-        }
-        return _typeInfo;
     }
 
     CustomQueryInterfaceResult ICustomQueryInterface.GetInterface(ref Guid iid, out nint ppv) => GetInterface(ref iid, out ppv);
@@ -91,6 +70,16 @@ public abstract partial class BaseControl : IDisposable,
 
     protected virtual void Close(OLECLOSE close)
     {
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _adviseHolder?.Dispose();
+            _clientSite?.Dispose();
+        }
+        base.Dispose(disposing);
     }
 
     protected static HRESULT RegisterType(ComRegistrationContext context)
@@ -395,6 +384,14 @@ public abstract partial class BaseControl : IDisposable,
         return cp == null ? Constants.CONNECT_E_NOCONNECTION : Constants.S_OK;
     }
 
+    HRESULT IOleWindow.ContextSensitiveHelp(BOOL fEnterMode) => NotImplemented();
+    HRESULT IOleWindow.GetWindow(out HWND phwnd)
+    {
+        phwnd = GetWindowHandle();
+        ComRegistration.Trace($"phwnd: {phwnd}");
+        return Constants.S_OK;
+    }
+
     [GeneratedComClass]
     private sealed partial class Verbs(IReadOnlyList<OLEVERB> verbs) : IEnumOLEVERB
     {
@@ -475,29 +472,4 @@ public abstract partial class BaseControl : IDisposable,
             return (max == count) ? Constants.S_OK : Constants.S_FALSE;
         }
     }
-
-    public void Dispose() { Dispose(disposing: true); GC.SuppressFinalize(this); }
-    protected virtual void Dispose(bool disposing)
-    {
-        if (!_disposedValue)
-        {
-            if (disposing)
-            {
-                // dispose managed state (managed objects)
-                _adviseHolder?.Dispose();
-                _clientSite?.Dispose();
-            }
-
-            // free unmanaged resources (unmanaged objects) and override finalizer
-            // set large fields to null
-            _disposedValue = true;
-        }
-    }
-
-    // // override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
-    // ~BaseControl()
-    // {
-    //     // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-    //     Dispose(disposing: false);
-    // }
 }
