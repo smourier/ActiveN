@@ -120,7 +120,7 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
     {
         try
         {
-            TracingUtilities.Trace($"dispIdMember: {dispIdMember} wFlags: {wFlags} cArgs: {pDispParams.cArgs} pVarResult: {pVarResult} pExcepInfo: {pExcepInfo} puArgErr: {puArgErr}");
+            TracingUtilities.Trace($"dispIdMember: {dispIdMember} (0x{dispIdMember:X8}) wFlags: {wFlags} cArgs: {pDispParams.cArgs} pVarResult: {pVarResult} pExcepInfo: {pExcepInfo} puArgErr: {puArgErr}");
             var type = GetType();
             // note we can return DISP_E_MEMBERNOTFOUND for a method/property that exists in the TLB but not in the actual type
             if (!_cache.TryGetValue(type, out var dispatchType) || dispatchType.GetMemberInfo(dispIdMember) is not MemberInfo member)

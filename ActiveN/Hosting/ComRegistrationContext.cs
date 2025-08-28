@@ -16,11 +16,11 @@ public class ComRegistrationContext(
 
     public virtual IList<Guid> ImplementedCategories { get; } =
     [
-        Categories.CATID_ActiveN,
-        Categories.CATID_Programmable,
-        Categories.CATID_Insertable,
-        Categories.CATID_SafeForScripting,
-        Categories.CATID_SafeForInitializing,
-        Categories.CATID_Control,
+        ControlCategories.CATID_ActiveN,
+        ControlCategories.CATID_Programmable,
+        ControlCategories.CATID_Insertable,
+        ControlCategories.CATID_SafeForScripting,
+        ControlCategories.CATID_SafeForInitializing,
+        ControlCategories.CATID_Control,
     ];
 }

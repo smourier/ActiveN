@@ -25,23 +25,29 @@ public abstract partial class BaseControl : BaseDispatch,
     private readonly ConcurrentDictionary<Guid, IConnectionPoint> _connectionPoints = new();
     private readonly ComObject<IOleAdviseHolder> _adviseHolder;
     private ComObject<IOleClientSite>? _clientSite;
+    private IComObject<IObjectWithSite>? _site;
     private ComObject<IAdviseSink>? _adviseSink;
+    private PropertyNotifySinkConnectionPoint _connectionPoint;
     private bool _isDirty;
+    private SIZE _extent;
 
     protected BaseControl()
     {
         TracingUtilities.Trace($"Created {GetType().FullName} ({GetType().GUID:B})");
         Functions.CreateOleAdviseHolder(out var obj).ThrowOnError();
         _adviseHolder = new ComObject<IOleAdviseHolder>(obj);
+        _connectionPoint = new PropertyNotifySinkConnectionPoint();
+        AddConnectionPoint(_connectionPoint);
     }
 
     protected virtual POINTERINACTIVE PointerActivationPolicy => POINTERINACTIVE.POINTERINACTIVE_ACTIVATEONENTRY;
     protected virtual OLEMISC MiscStatus => OLEMISC.OLEMISC_RECOMPOSEONRESIZE | OLEMISC.OLEMISC_CANTLINKINSIDE | OLEMISC.OLEMISC_INSIDEOUT | OLEMISC.OLEMISC_ACTIVATEWHENVISIBLE | OLEMISC.OLEMISC_SETCLIENTSITEFIRST;
+    protected virtual VIEWSTATUS ViewStatus => VIEWSTATUS.VIEWSTATUS_OPAQUE;
 
     protected virtual void AddConnectionPoint(IConnectionPoint connectionPoint)
     {
         ArgumentNullException.ThrowIfNull(connectionPoint);
-        if (connectionPoint is ConnectionPoint target)
+        if (connectionPoint is BaseConnectionPoint target)
         {
             if (target._container != null)
                 throw new ArgumentException("Connection point already has a container", nameof(connectionPoint));
@@ -73,7 +79,7 @@ public abstract partial class BaseControl : BaseDispatch,
         //{
         //    TracingUtilities.Trace($"GetInterface: {GuidNames.GetInterfaceIdName(iid)}");
         //}
-        TracingUtilities.Trace($"GetInterface: {iid.GetName()}");
+        TracingUtilities.Trace($"iid: {iid.GetName()}");
         return CustomQueryInterfaceResult.NotHandled;
     }
 
@@ -87,6 +93,7 @@ public abstract partial class BaseControl : BaseDispatch,
         {
             _adviseHolder?.Dispose();
             _clientSite?.Dispose();
+            _site?.Dispose();
         }
         base.Dispose(disposing);
     }
@@ -99,17 +106,17 @@ public abstract partial class BaseControl : BaseDispatch,
         // add the "Control" subkey to indicate that this is an ActiveX control
         using var key = ComRegistration.EnsureWritableSubKey(context.RegistryRoot, Path.Combine(ComRegistration.ClsidRegistryKey, context.GUID.ToString("B")));
 
-        if (context.ImplementedCategories.Contains(Categories.CATID_Control))
+        if (context.ImplementedCategories.Contains(ControlCategories.CATID_Control))
         {
             key.CreateSubKey("Control", false)?.Dispose();
         }
 
-        if (context.ImplementedCategories.Contains(Categories.CATID_Insertable))
+        if (context.ImplementedCategories.Contains(ControlCategories.CATID_Insertable))
         {
             key.CreateSubKey("Insertable", false)?.Dispose();
         }
 
-        if (context.ImplementedCategories.Contains(Categories.CATID_Programmable))
+        if (context.ImplementedCategories.Contains(ControlCategories.CATID_Programmable))
         {
             key.CreateSubKey("Programmable", false)?.Dispose();
         }
@@ -180,16 +187,35 @@ public abstract partial class BaseControl : BaseDispatch,
 
     HRESULT IOleObject.GetClipboardData(uint dwReserved, out IDataObject ppDataObject) { ppDataObject = null!; return NotImplemented(); }
 
-    HRESULT IOleObject.DoVerb(int iVerb, nint lpmsg, IOleClientSite pActiveSite, int lindex, HWND hwndParent, nint lprcPosRect)
+    unsafe HRESULT IOleObject.DoVerb(int iVerb, nint lpmsg, IOleClientSite pActiveSite, int lindex, HWND hwndParent, nint lprcPosRect)
     {
         var verb = (OLEIVERB)iVerb;
+        var hr = Constants.S_OK;
         TracingUtilities.Trace($"iVerb: {verb} lpmsg: {lpmsg} pActiveSite: {pActiveSite} lindex: {lindex} hwndParent: {hwndParent} lprcPosRect: {lprcPosRect}");
-        return Constants.S_OK;
+        if (lprcPosRect != 0)
+        {
+            var rcPosRect = *(RECT*)lprcPosRect;
+            TracingUtilities.Trace($"rcPosRect: {rcPosRect}");
+        }
+
+        if (verb == OLEIVERB.OLEIVERB_INPLACEACTIVATE)
+        {
+            if (lprcPosRect != 0)
+            {
+                var rcPosRect = *(RECT*)lprcPosRect;
+                _extent = rcPosRect.Size;
+                TracingUtilities.Trace($"extent: {_extent}");
+            }
+            hr = pActiveSite.ShowObject();
+        }
+        TracingUtilities.Trace($"hr: {hr}");
+        return hr;
     }
 
     HRESULT IOleObject.EnumVerbs(out IEnumOLEVERB ppEnumOleVerb)
     {
-        ppEnumOleVerb = new Verbs([]);
+        TracingUtilities.Trace();
+        ppEnumOleVerb = new EnumVerbs([]);
         return Constants.S_OK;
     }
 
@@ -202,12 +228,32 @@ public abstract partial class BaseControl : BaseDispatch,
     HRESULT IOleObject.GetUserType(uint dwFormOfType, out PWSTR pszUserType)
     {
         var hr = Functions.OleRegGetUserType(GetType().GUID, dwFormOfType, out pszUserType);
+        TracingUtilities.Trace($"dwFormOfType: {dwFormOfType} pszUserType: '{pszUserType}' hr: {hr}");
         return hr;
     }
 
-    HRESULT IOleObject.SetExtent(DVASPECT dwDrawAspect, in SIZE psizel) => NotImplemented();
+    HRESULT IOleObject.SetExtent(DVASPECT dwDrawAspect, in SIZE psizel)
+    {
+        TracingUtilities.Trace($"dwDrawAspect: {dwDrawAspect} psizel: {psizel}");
+        if (dwDrawAspect != DVASPECT.DVASPECT_CONTENT)
+            return Constants.DV_E_DVASPECT;
 
-    HRESULT IOleObject.GetExtent(DVASPECT dwDrawAspect, out SIZE psizel) { psizel = new(); return NotImplemented(); }
+        _extent = psizel;
+        return Constants.S_OK;
+    }
+
+    HRESULT IOleObject.GetExtent(DVASPECT dwDrawAspect, out SIZE psizel)
+    {
+        TracingUtilities.Trace($"dwDrawAspect: {dwDrawAspect}");
+        if (dwDrawAspect != DVASPECT.DVASPECT_CONTENT)
+        {
+            psizel = new();
+            return Constants.DV_E_DVASPECT;
+        }
+
+        psizel = _extent;
+        return Constants.S_OK;
+    }
 
     HRESULT IOleObject.Advise(IAdviseSink pAdvSink, out uint pdwConnection)
     {
@@ -232,9 +278,9 @@ public abstract partial class BaseControl : BaseDispatch,
 
     HRESULT IOleObject.GetMiscStatus(DVASPECT dwAspect, out OLEMISC pdwStatus)
     {
-        var hr = Functions.OleRegGetMiscStatus(GetType().GUID, (uint)dwAspect, out var status);
-        pdwStatus = (OLEMISC)status;
-        return hr;
+        pdwStatus = MiscStatus;
+        TracingUtilities.Trace($"dwAspect: {dwAspect} pdwStatus: {pdwStatus}");
+        return Constants.S_OK;
     }
 
     HRESULT IOleObject.SetColorScheme(in LOGPALETTE pLogpal) => NotImplemented();
@@ -247,7 +293,11 @@ public abstract partial class BaseControl : BaseDispatch,
         return ti != null ? Constants.S_OK : Constants.E_UNEXPECTED;
     }
 
-    HRESULT IPersistStreamInit.IsDirty() => _isDirty ? Constants.S_OK : Constants.S_FALSE;
+    HRESULT IPersistStreamInit.IsDirty()
+    {
+        TracingUtilities.Trace($"IsDirty: {_isDirty}");
+        return _isDirty ? Constants.S_OK : Constants.S_FALSE;
+    }
 
     HRESULT IPersistStreamInit.Load(IStream pStm)
     {
@@ -279,7 +329,13 @@ public abstract partial class BaseControl : BaseDispatch,
         return Constants.S_OK;
     }
 
-    HRESULT IViewObject2.GetExtent(DVASPECT dwDrawAspect, int lindex, in DVTARGETDEVICE ptd, out SIZE lpsizel) { lpsizel = new(); return NotImplemented(); }
+    HRESULT IViewObject2.GetExtent(DVASPECT dwDrawAspect, int lindex, nint ptd, out SIZE lpsizel)
+    {
+        TracingUtilities.Trace($"dwDrawAspect: {dwDrawAspect} lindex: {lindex} ptd: {ptd}");
+        lpsizel = _extent;
+        return Constants.S_OK;
+    }
+
     HRESULT IViewObject.Draw(DVASPECT dwDrawAspect, int lindex, nint pvAspect, nint ptd, HDC hdcTargetDev, HDC hdcDraw, nint lprcBounds, nint lprcWBounds, nint pfnContinue, nuint dwContinue)
     {
         TracingUtilities.Trace($"dwDrawAspect: {dwDrawAspect} lindex: {lindex} pvAspect: {pvAspect} ptd: {ptd} hdcTargetDev: {hdcTargetDev} hdcDraw: {hdcDraw} lprcBounds: {lprcBounds} lprcWBounds: {lprcWBounds} pfnContinue: {pfnContinue} dwContinue: {dwContinue}");
@@ -307,9 +363,8 @@ public abstract partial class BaseControl : BaseDispatch,
     HRESULT IViewObjectEx.GetRect(uint dwAspect, out RECTL pRect) { pRect = new(); return NotImplemented(); }
     HRESULT IViewObjectEx.GetViewStatus(out uint pdwStatus)
     {
-        var status = VIEWSTATUS.VIEWSTATUS_OPAQUE;
-        pdwStatus = (uint)status;
-        TracingUtilities.Trace($"pdwStatus: {status}");
+        pdwStatus = (uint)ViewStatus;
+        TracingUtilities.Trace($"pdwStatus: {ViewStatus}");
         return Constants.S_OK;
     }
 
@@ -332,7 +387,7 @@ public abstract partial class BaseControl : BaseDispatch,
     }
 
     HRESULT IViewObjectEx.QueryHitRect(uint dwAspect, in RECT pRectBounds, in RECT pRectLoc, int lCloseHint, out uint pHitResult) { pHitResult = 0; return NotImplemented(); }
-    HRESULT IViewObjectEx.GetNaturalExtent(DVASPECT dwAspect, int lindex, in DVTARGETDEVICE ptd, HDC hicTargetDev, in DVEXTENTINFO pExtentInfo, out SIZE pSizel) { pSizel = new(); return NotImplemented(); }
+    HRESULT IViewObjectEx.GetNaturalExtent(DVASPECT dwAspect, int lindex, nint ptd, HDC hicTargetDev, nint pExtentInfo, nint pSizel) { pSizel = 0; return NotImplemented(); }
 
     HRESULT IOleControl.GetControlInfo(ref CONTROLINFO pCI) { pCI = new(); return NotImplemented(); }
     HRESULT IOleControl.OnMnemonic(in MSG pMsg)
@@ -382,7 +437,7 @@ public abstract partial class BaseControl : BaseDispatch,
 
     HRESULT IConnectionPointContainer.EnumConnectionPoints(out IEnumConnectionPoints ppEnum)
     {
-        ppEnum = new ConnectionsPoints([.. _connectionPoints]);
+        ppEnum = new EnumConnectionPoints([.. _connectionPoints]);
         return Constants.S_OK;
     }
 
@@ -396,209 +451,81 @@ public abstract partial class BaseControl : BaseDispatch,
     HRESULT IOleWindow.ContextSensitiveHelp(BOOL fEnterMode) => NotImplemented();
     HRESULT IOleWindow.GetWindow(out HWND phwnd)
     {
+        TracingUtilities.Trace();
         phwnd = GetWindowHandle();
         TracingUtilities.Trace($"phwnd: {phwnd}");
         return Constants.S_OK;
     }
 
-    HRESULT IDataObject.GetData(in FORMATETC pformatetcIn, out STGMEDIUM pmedium)
-    {
-        throw new NotImplementedException();
-    }
-
-    HRESULT IDataObject.GetDataHere(in FORMATETC pformatetc, ref STGMEDIUM pmedium)
-    {
-        throw new NotImplementedException();
-    }
-
-    HRESULT IDataObject.QueryGetData(in FORMATETC pformatetc)
-    {
-        throw new NotImplementedException();
-    }
-
-    HRESULT IDataObject.GetCanonicalFormatEtc(in FORMATETC pformatectIn, out FORMATETC pformatetcOut)
-    {
-        throw new NotImplementedException();
-    }
-
-    HRESULT IDataObject.SetData(in FORMATETC pformatetc, in STGMEDIUM pmedium, BOOL fRelease)
-    {
-        throw new NotImplementedException();
-    }
-
-    HRESULT IDataObject.EnumFormatEtc(uint dwDirection, out IEnumFORMATETC ppenumFormatEtc)
-    {
-        throw new NotImplementedException();
-    }
-
-    HRESULT IDataObject.DAdvise(in FORMATETC pformatetc, uint advf, IAdviseSink pAdvSink, out uint pdwConnection)
-    {
-        throw new NotImplementedException();
-    }
-
-    HRESULT IDataObject.DUnadvise(uint dwConnection)
-    {
-        throw new NotImplementedException();
-    }
-
-    HRESULT IDataObject.EnumDAdvise(out IEnumSTATDATA ppenumAdvise)
-    {
-        throw new NotImplementedException();
-    }
+    HRESULT IDataObject.GetData(in FORMATETC pformatetcIn, out STGMEDIUM pmedium) { pmedium = new(); return NotImplemented(); }
+    HRESULT IDataObject.GetDataHere(in FORMATETC pformatetc, ref STGMEDIUM pmedium) => NotImplemented();
+    HRESULT IDataObject.QueryGetData(in FORMATETC pformatetc) => NotImplemented();
+    HRESULT IDataObject.GetCanonicalFormatEtc(in FORMATETC pformatectIn, out FORMATETC pformatetcOut) { pformatetcOut = new(); return NotImplemented(); }
+    HRESULT IDataObject.SetData(in FORMATETC pformatetc, in STGMEDIUM pmedium, BOOL fRelease) => NotImplemented();
+    HRESULT IDataObject.EnumFormatEtc(uint dwDirection, out IEnumFORMATETC ppenumFormatEtc) { ppenumFormatEtc = null!; return NotImplemented(); }
+    HRESULT IDataObject.DAdvise(in FORMATETC pformatetc, uint advf, IAdviseSink pAdvSink, out uint pdwConnection) { pdwConnection = 0; return NotImplemented(); }
+    HRESULT IDataObject.DUnadvise(uint dwConnection) => NotImplemented();
+    HRESULT IDataObject.EnumDAdvise(out IEnumSTATDATA ppenumAdvise) { ppenumAdvise = null!; return NotImplemented(); }
 
     HRESULT IObjectWithSite.SetSite(nint pUnkSite)
     {
-        throw new NotImplementedException();
+        _site?.Dispose();
+        _site = DirectN.Extensions.Com.ComObject.FromPointer<IObjectWithSite>(pUnkSite);
+        TracingUtilities.Trace($"Site: {pUnkSite}");
+        return Constants.S_OK;
     }
 
     HRESULT IObjectWithSite.GetSite(in Guid riid, out nint ppvSite)
     {
-        throw new NotImplementedException();
+        TracingUtilities.Trace($"riid: {riid.GetName()}");
+        if (_site == null)
+        {
+            ppvSite = 0;
+            return Constants.E_NOINTERFACE;
+        }
+
+        ppvSite = DirectN.Extensions.Com.ComObject.GetOrCreateComInstance(_site);
+        return ppvSite != 0 ? Constants.S_OK : Constants.E_NOINTERFACE;
     }
 
-    HRESULT IOleInPlaceActiveObject.TranslateAccelerator(nint lpmsg)
+    HRESULT IOleInPlaceActiveObject.TranslateAccelerator(nint lpmsg) => NotImplemented();
+    HRESULT IOleInPlaceActiveObject.OnFrameWindowActivate(BOOL fActivate) => NotImplemented();
+    HRESULT IOleInPlaceActiveObject.OnDocWindowActivate(BOOL fActivate) => NotImplemented();
+    HRESULT IOleInPlaceActiveObject.ResizeBorder(in RECT prcBorder, IOleInPlaceUIWindow pUIWindow, BOOL fFrameWindow) => NotImplemented();
+    HRESULT IOleInPlaceActiveObject.EnableModeless(BOOL fEnable) => NotImplemented();
+    HRESULT IOleInPlaceObject.InPlaceDeactivate() => NotImplemented();
+    HRESULT IOleInPlaceObject.UIDeactivate() => NotImplemented();
+    HRESULT IOleInPlaceObject.SetObjectRects(in RECT lprcPosRect, in RECT lprcClipRect) => NotImplemented();
+    HRESULT IOleInPlaceObject.ReactivateAndUndo() => NotImplemented();
+    unsafe HRESULT IQuickActivate.QuickActivate(in QACONTAINER pQaContainer, ref QACONTROL pQaControl)
     {
-        throw new NotImplementedException();
-    }
-
-    HRESULT IOleInPlaceActiveObject.OnFrameWindowActivate(BOOL fActivate)
-    {
-        throw new NotImplementedException();
-    }
-
-    HRESULT IOleInPlaceActiveObject.OnDocWindowActivate(BOOL fActivate)
-    {
-        throw new NotImplementedException();
-    }
-
-    HRESULT IOleInPlaceActiveObject.ResizeBorder(in RECT prcBorder, IOleInPlaceUIWindow pUIWindow, BOOL fFrameWindow)
-    {
-        throw new NotImplementedException();
-    }
-
-    HRESULT IOleInPlaceActiveObject.EnableModeless(BOOL fEnable)
-    {
-        throw new NotImplementedException();
-    }
-
-    HRESULT IOleInPlaceObject.InPlaceDeactivate()
-    {
-        throw new NotImplementedException();
-    }
-
-    HRESULT IOleInPlaceObject.UIDeactivate()
-    {
-        throw new NotImplementedException();
-    }
-
-    HRESULT IOleInPlaceObject.SetObjectRects(in RECT lprcPosRect, in RECT lprcClipRect)
-    {
-        throw new NotImplementedException();
-    }
-
-    HRESULT IOleInPlaceObject.ReactivateAndUndo()
-    {
-        throw new NotImplementedException();
-    }
-
-    HRESULT IQuickActivate.QuickActivate(in QACONTAINER pQaContainer, ref QACONTROL pQaControl)
-    {
-        throw new NotImplementedException();
+        TracingUtilities.Trace($"pQaContainer: {pQaContainer} pQacontrol size: {pQaControl.cbSize}");
+        pQaControl.cbSize = (uint)sizeof(QACONTROL);
+        pQaControl.dwMiscStatus = (uint)MiscStatus;
+        pQaControl.dwViewStatus = (uint)ViewStatus;
+        pQaControl.dwPointerActivationPolicy = (uint)PointerActivationPolicy;
+        TracingUtilities.Trace($"dwMiscStatus: {MiscStatus} dwViewStatus: {ViewStatus} dwPointerActivationPolicy: {PointerActivationPolicy}");
+        return Constants.S_OK;
     }
 
     HRESULT IQuickActivate.SetContentExtent(in SIZE pSizel)
     {
-        throw new NotImplementedException();
+        TracingUtilities.Trace($"pSizel: {pSizel}");
+        _extent = pSizel;
+        return Constants.S_OK;
     }
 
     HRESULT IQuickActivate.GetContentExtent(out SIZE pSizel)
     {
-        throw new NotImplementedException();
+        TracingUtilities.Trace($"pSizel: {_extent}");
+        pSizel = _extent;
+        return Constants.S_OK;
     }
 
     HRESULT IServiceProvider.QueryService(in Guid guidService, in Guid riid, out nint ppvObject)
     {
-        throw new NotImplementedException();
-    }
-
-    [GeneratedComClass]
-    private sealed partial class Verbs(IReadOnlyList<OLEVERB> verbs) : IEnumOLEVERB
-    {
-        private int _index = -1;
-
-        public HRESULT Clone(out IEnumOLEVERB enumerator)
-        {
-            enumerator = new Verbs(verbs);
-            return Constants.S_OK;
-        }
-
-        public HRESULT Next(uint count, OLEVERB[] outVerbs, nint outFetched)
-        {
-            var max = Math.Max(0, Math.Min(outVerbs.Length - (_index + 1), count));
-            var fetched = max;
-            if (fetched > 0)
-            {
-                for (var i = _index + 1; i < fetched; i++)
-                {
-                    outVerbs[i] = verbs[i];
-                    _index++;
-                }
-            }
-
-            if (outFetched != 0)
-            {
-                Marshal.WriteInt32(outFetched, (int)fetched);
-            }
-            return (fetched == count) ? Constants.S_OK : Constants.S_FALSE;
-        }
-
-        public HRESULT Reset() => _index = -1;
-        public HRESULT Skip(uint count)
-        {
-            var max = (uint)Math.Max(0, Math.Min(verbs.Count - (_index + 1), count));
-            if (max > 0)
-            {
-                _index += (int)max;
-            }
-            return (max == count) ? Constants.S_OK : Constants.S_FALSE;
-        }
-    }
-
-    [GeneratedComClass]
-    private sealed partial class ConnectionsPoints(IReadOnlyList<KeyValuePair<Guid, IConnectionPoint>> connections) : IEnumConnectionPoints
-    {
-        private int _index = -1;
-
-        public HRESULT Clone(out IEnumConnectionPoints enumerator)
-        {
-            enumerator = new ConnectionsPoints(connections);
-            return Constants.S_OK;
-        }
-
-        public HRESULT Next(uint count, nint[] points, out uint fetched)
-        {
-            var max = (uint)Math.Max(0, Math.Min(connections.Count - (_index + 1), count));
-            fetched = max;
-            if (fetched > 0)
-            {
-                for (var i = _index + 1; i < fetched; i++)
-                {
-                    points[i] = DirectN.Extensions.Com.ComObject.GetOrCreateComInstance<IConnectionPoint>(connections[i].Value);
-                    _index++;
-                }
-            }
-            return (fetched == count) ? Constants.S_OK : Constants.S_FALSE;
-        }
-
-        public HRESULT Reset() => _index = -1;
-        public HRESULT Skip(uint count)
-        {
-            var max = (uint)Math.Max(0, Math.Min(connections.Count - (_index + 1), count));
-            if (max > 0)
-            {
-                _index += (int)max;
-            }
-            return (max == count) ? Constants.S_OK : Constants.S_FALSE;
-        }
+        TracingUtilities.Trace($"guidService: {guidService.GetName()} riid: {riid.GetName()}");
+        ppvObject = 0;
+        return Constants.E_NOINTERFACE;
     }
 }
