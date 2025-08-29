@@ -13,6 +13,7 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
     protected abstract object? GetTaskResult(Task task);
     protected abstract HWND GetWindowHandle();
     protected abstract ComRegistration ComRegistration { get; }
+
     protected virtual int AutoDispidsBase => 0x10000;
 
     protected virtual ComObject<ITypeInfo>? EnsureTypeInfo()

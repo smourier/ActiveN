@@ -89,94 +89,7 @@ public abstract partial class ComRegistration
     protected virtual ComRegistrationContext CreateRegistrationContext(RegistryKey root, ComRegistrationType type) => new(this, root, type);
     protected virtual ClassFactory CreateClassFactory(Guid clsid) => new(clsid, this);
 
-    public static uint WrapErrors(Func<HRESULT> action, Action? actionOnError = null)
-    {
-        try
-        {
-            return (uint)action();
-        }
-        catch (SecurityException se)
-        {
-            // transform this one as a well-known access denied
-            TracingUtilities.Trace($"Ex: {se}");
-            if (actionOnError != null)
-            {
-                try
-                {
-                    actionOnError();
-                }
-                catch (Exception ex2)
-                {
-                    TracingUtilities.Trace($"Ex2: {ex2}");
-                    // continue;
-                }
-            }
-            return (uint)Constants.E_ACCESSDENIED;
-        }
-        catch (Exception ex)
-        {
-            TracingUtilities.Trace($"Ex: {ex}");
-            if (actionOnError != null)
-            {
-                try
-                {
-                    actionOnError();
-                }
-                catch (Exception ex2)
-                {
-                    TracingUtilities.Trace($"Ex2: {ex2}");
-                    // continue;
-                }
-            }
-            return (uint)ex.HResult;
-        }
-    }
-
-    public static uint WrapErrors(Action action, Action? actionOnError = null)
-    {
-        try
-        {
-            action();
-            return 0;
-        }
-        catch (SecurityException se)
-        {
-            // transform this one as a well-known access denied
-            TracingUtilities.Trace($"Ex: {se}");
-            if (actionOnError != null)
-            {
-                try
-                {
-                    actionOnError();
-                }
-                catch (Exception ex2)
-                {
-                    TracingUtilities.Trace($"Ex2: {ex2}");
-                    // continue;
-                }
-            }
-            return (uint)Constants.E_ACCESSDENIED;
-        }
-        catch (Exception ex)
-        {
-            TracingUtilities.Trace($"Ex: {ex}");
-            if (actionOnError != null)
-            {
-                try
-                {
-                    actionOnError();
-                }
-                catch (Exception ex2)
-                {
-                    TracingUtilities.Trace($"Ex2: {ex2}");
-                    // continue;
-                }
-            }
-            return (uint)ex.HResult;
-        }
-    }
-
-    protected virtual HRESULT RegisterServer() => WrapErrors(() =>
+    protected virtual HRESULT RegisterServer() => TracingUtilities.WrapErrors(() =>
     {
         TracingUtilities.Trace($"Path: {DllPath}");
 
@@ -227,7 +140,7 @@ public abstract partial class ComRegistration
         }
     }
 
-    protected virtual HRESULT UnregisterServer() => WrapErrors(() =>
+    protected virtual HRESULT UnregisterServer() => TracingUtilities.WrapErrors(() =>
     {
         TracingUtilities.Trace($"Path: {DllPath}");
         var root = InstallInHkcu ? Registry.CurrentUser : Registry.LocalMachine;
@@ -293,7 +206,7 @@ public abstract partial class ComRegistration
         return null;
     }
 
-    protected unsafe HRESULT GetClassObject(nint rclsid, nint riid, nint ppv) => WrapErrors(() =>
+    protected unsafe HRESULT GetClassObject(nint rclsid, nint riid, nint ppv) => TracingUtilities.WrapErrors(() =>
     {
         if (rclsid == 0 || riid == 0 || ppv == 0)
             return Constants.E_POINTER;
@@ -307,7 +220,7 @@ public abstract partial class ComRegistration
         return unk == 0 ? Constants.E_NOINTERFACE : Constants.S_OK;
     });
 
-    protected virtual HRESULT CanUnloadNow() => WrapErrors(() =>
+    protected virtual HRESULT CanUnloadNow() => TracingUtilities.WrapErrors(() =>
     {
         TracingUtilities.Trace($"Path: {DllPath} CanUnload: {CanUnload}");
         TracingUtilities.FlushTextWriter(); // host asking to quit, it's a good time to flush traces
@@ -317,7 +230,7 @@ public abstract partial class ComRegistration
     // call for example
     // "regsvr32 /i:user /n" to register in HKCU without calling DllRegisterServer
     // "regsvr32 /i:user /n /u" to unregister from HKCU
-    protected virtual HRESULT Install(bool install, nint cmdLinePtr) => WrapErrors(() =>
+    protected virtual HRESULT Install(bool install, nint cmdLinePtr) => TracingUtilities.WrapErrors(() =>
     {
         TracingUtilities.Trace($"Path: {DllPath}");
         if (cmdLinePtr != 0)
@@ -339,7 +252,7 @@ public abstract partial class ComRegistration
         }
     });
 
-    protected HRESULT ThunkInit(nint thunkDllPathPtr) => WrapErrors(() =>
+    protected HRESULT ThunkInit(nint thunkDllPathPtr) => TracingUtilities.WrapErrors(() =>
     {
         ThunkDllPath = Marshal.PtrToStringUni(thunkDllPathPtr);
         TracingUtilities.Trace($"Path: {DllPath} ThunkDllPathPtr: {ThunkDllPath}");

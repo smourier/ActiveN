@@ -12,4 +12,4 @@
 [assembly: ComVisible(false)]
 [assembly: Guid("8b7f7089-aa3b-4184-b035-924a4d25037b")]
 [assembly: DisableRuntimeMarshalling]
-[assembly: SupportedOSPlatform("windows6.0")]
+[assembly: SupportedOSPlatform("windows6.0.6000")]

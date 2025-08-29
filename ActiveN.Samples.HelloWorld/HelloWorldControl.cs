@@ -11,10 +11,6 @@
 public partial class HelloWorldControl : BaseControl, IHelloWorldControl
 {
     protected override ComRegistration ComRegistration => ComHosting.Instance;
-    protected override HWND GetWindowHandle()
-    {
-        throw new NotImplementedException();
-    }
 
     // note this is necesary to avoid trimming Task<T>.Result for AOT publishing
     // all Task<T> results should be unwrapped here

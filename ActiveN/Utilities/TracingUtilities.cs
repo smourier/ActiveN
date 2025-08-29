@@ -57,4 +57,93 @@ public static class TracingUtilities
         var name = filePath != null ? Path.GetFileNameWithoutExtension(filePath) : null;
         EventProvider.Default.WriteMessageEvent($"[{Environment.CurrentManagedThreadId}]{name}:: {methodName}: {text}");
     }
+
+    public static uint WrapErrors(this Func<HRESULT> action, Action? actionOnError = null)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        try
+        {
+            return (uint)action();
+        }
+        catch (SecurityException se)
+        {
+            // transform this one as a well-known access denied
+            Trace($"Ex: {se}");
+            if (actionOnError != null)
+            {
+                try
+                {
+                    actionOnError();
+                }
+                catch (Exception ex2)
+                {
+                    Trace($"Ex2: {ex2}");
+                    // continue;
+                }
+            }
+            return (uint)Constants.E_ACCESSDENIED;
+        }
+        catch (Exception ex)
+        {
+            Trace($"Ex: {ex}");
+            if (actionOnError != null)
+            {
+                try
+                {
+                    actionOnError();
+                }
+                catch (Exception ex2)
+                {
+                    Trace($"Ex2: {ex2}");
+                    // continue;
+                }
+            }
+            return (uint)ex.HResult;
+        }
+    }
+
+    public static uint WrapErrors(Action action, Action? actionOnError = null)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        try
+        {
+            action();
+            return 0;
+        }
+        catch (SecurityException se)
+        {
+            // transform this one as a well-known access denied
+            Trace($"Ex: {se}");
+            if (actionOnError != null)
+            {
+                try
+                {
+                    actionOnError();
+                }
+                catch (Exception ex2)
+                {
+                    Trace($"Ex2: {ex2}");
+                    // continue;
+                }
+            }
+            return (uint)Constants.E_ACCESSDENIED;
+        }
+        catch (Exception ex)
+        {
+            Trace($"Ex: {ex}");
+            if (actionOnError != null)
+            {
+                try
+                {
+                    actionOnError();
+                }
+                catch (Exception ex2)
+                {
+                    Trace($"Ex2: {ex2}");
+                    // continue;
+                }
+            }
+            return (uint)ex.HResult;
+        }
+    }
 }
