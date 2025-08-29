@@ -1,8 +1,7 @@
 ﻿namespace ActiveN;
 
-[GeneratedComClass]
 [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)]
-public abstract partial class BaseDispatch : IDispatch, IDisposable
+public abstract partial class BaseDispatch : IDisposable
 {
     private static readonly ConcurrentDictionary<Type, DispatchType> _cache = new();
 
@@ -57,9 +56,6 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
     //     Dispose(disposing: false);
     // }
 
-    HRESULT IDispatch.GetIDsOfNames(in Guid riid, PWSTR[] rgszNames, uint cNames, uint lcid, int[] rgDispId) =>
-        GetIDsOfNames(in riid, rgszNames, cNames, lcid, rgDispId);
-
     protected virtual HRESULT GetIDsOfNames(in Guid riid, PWSTR[] rgszNames, uint cNames, uint lcid, int[] rgDispId)
     {
         if (rgszNames == null || rgszNames.Length == 0 || rgszNames.Length != cNames)
@@ -113,9 +109,6 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
 
         return Constants.S_OK;
     }
-
-    HRESULT IDispatch.Invoke(int dispIdMember, in Guid riid, uint lcid, DISPATCH_FLAGS wFlags, in DISPPARAMS pDispParams, nint pVarResult, nint pExcepInfo, nint puArgErr) =>
-        Invoke(dispIdMember, riid, lcid, wFlags, pDispParams, pVarResult, pExcepInfo, puArgErr);
 
     protected virtual unsafe HRESULT Invoke(int dispIdMember, in Guid riid, uint lcid, DISPATCH_FLAGS wFlags, in DISPPARAMS pDispParams, nint pVarResult, nint pExcepInfo, nint puArgErr)
     {
@@ -293,7 +286,7 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
         }
     }
 
-    HRESULT IDispatch.GetTypeInfo(uint iTInfo, uint lcid, out ITypeInfo ppTInfo)
+    protected virtual HRESULT GetTypeInfo(uint iTInfo, uint lcid, out ITypeInfo ppTInfo)
     {
         TracingUtilities.Trace($"iTInfo {iTInfo}");
         ppTInfo = null!;
@@ -309,7 +302,7 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
         return Constants.E_NOTIMPL;
     }
 
-    HRESULT IDispatch.GetTypeInfoCount(out uint pctinfo)
+    protected virtual HRESULT GetTypeInfoCount(out uint pctinfo)
     {
         var ti = EnsureTypeInfo();
         pctinfo = ti != null ? 1u : 0u;
@@ -317,8 +310,9 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
         return ti != null ? Constants.S_OK : Constants.E_NOTIMPL;
     }
 
-    private static void RunMessageLoop(Func<MSG, bool> exitLoopFunc)
+    public static void RunMessageLoop(Func<MSG, bool> exitLoopFunc)
     {
+        ArgumentNullException.ThrowIfNull(exitLoopFunc);
         do
         {
             if (Functions.PeekMessageW(out var msg, HWND.Null, 0, 0, PEEK_MESSAGE_REMOVE_TYPE.PM_REMOVE))
@@ -343,6 +337,7 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
     {
         private readonly Dictionary<string, DispatchMember> _membersByName = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<int, DispatchMember> _memberByDispIds = [];
+        private readonly HashSet<string> _restrictedNames = [];
 
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)]
         public Type Type { get; } = type;
@@ -376,10 +371,16 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
                         continue;
 
                     // skip restricted (QueryInterface, AddRef, Invoke, etc.)
-                    if (funcDesc.Value.wFuncFlags.HasFlag(FUNCFLAGS.FUNCFLAG_FRESTRICTED))
-                        continue;
-
                     var name = TypeLib.GetName(refTypeInfo.Object, funcDesc.Value.memid);
+                    if (funcDesc.Value.wFuncFlags.HasFlag(FUNCFLAGS.FUNCFLAG_FRESTRICTED))
+                    {
+                        if (name != null)
+                        {
+                            _restrictedNames.Add(name);
+                        }
+                        continue;
+                    }
+
                     TracingUtilities.Trace($"funcDesc: id: {funcDesc.Value.memid} name:'{name}' kind: {funcDesc.Value.funckind} invkind: {funcDesc.Value.invkind} params: {funcDesc.Value.cParams} paramsOpt: {funcDesc.Value.cParamsOpt} flags: {funcDesc.Value.wFuncFlags}");
                     if (name == null)
                         continue;
@@ -403,6 +404,9 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
             for (var i = 0; i < methods.Length; i++)
             {
                 var method = methods[i];
+                if (_restrictedNames.Contains(method.Name))
+                    continue;
+
                 if (_membersByName.ContainsKey(method.Name))
                     continue;
 
@@ -415,6 +419,9 @@ public abstract partial class BaseDispatch : IDispatch, IDisposable
             for (var i = 0; i < properties.Length; i++)
             {
                 var property = properties[i];
+                if (_restrictedNames.Contains(property.Name))
+                    continue;
+
                 if (_membersByName.ContainsKey(property.Name))
                     continue;
 

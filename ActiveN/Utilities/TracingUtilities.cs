@@ -5,7 +5,7 @@ public static class TracingUtilities
     // write all traces on a single thread to avoid garbling the output
     private static int _threadId;
     private static TextWriter? _traceWriter;
-    private static readonly SingleThreadTaskScheduler _writerScheduler = new SingleThreadTaskScheduler(thread =>
+    private static readonly SingleThreadTaskScheduler _writerScheduler = new(thread =>
     {
         _threadId = thread.ManagedThreadId;
         thread.Name = "ActiveN Trace Writer";

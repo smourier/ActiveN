@@ -11,6 +11,7 @@
 public partial class HelloWorldControl : BaseControl, IHelloWorldControl
 {
     protected override ComRegistration ComRegistration => ComHosting.Instance;
+    protected override Window CreateWindow(HWND parentHandle, RECT rect) => new HelloWorldWindow(parentHandle, GetDefaultWindowStyle(parentHandle), rect);
 
     // note this is necesary to avoid trimming Task<T>.Result for AOT publishing
     // all Task<T> results should be unwrapped here
@@ -61,6 +62,18 @@ public partial class HelloWorldControl : BaseControl, IHelloWorldControl
         TracingUtilities.Trace();
         return Constants.S_OK;
     }
+
+    HRESULT IDispatch.GetIDsOfNames(in Guid riid, PWSTR[] rgszNames, uint cNames, uint lcid, int[] rgDispId) =>
+        GetIDsOfNames(in riid, rgszNames, cNames, lcid, rgDispId);
+
+    HRESULT IDispatch.Invoke(int dispIdMember, in Guid riid, uint lcid, DISPATCH_FLAGS wFlags, in DISPPARAMS pDispParams, nint pVarResult, nint pExcepInfo, nint puArgErr) =>
+        Invoke(dispIdMember, riid, lcid, wFlags, pDispParams, pVarResult, pExcepInfo, puArgErr);
+
+    HRESULT IDispatch.GetTypeInfo(uint iTInfo, uint lcid, out ITypeInfo ppTInfo) =>
+        GetTypeInfo(iTInfo, lcid, out ppTInfo);
+
+    HRESULT IDispatch.GetTypeInfoCount(out uint pctinfo) =>
+        GetTypeInfoCount(out pctinfo);
 
     // COM registration
     public static new HRESULT RegisterType(ComRegistrationContext context)

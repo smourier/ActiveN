@@ -1,19 +1,18 @@
-﻿using IServiceProvider = DirectN.IServiceProvider;
-
-namespace ActiveN;
+﻿namespace ActiveN;
 
 [GeneratedComClass]
 public abstract partial class BaseControl : BaseDispatch,
     IOleObject,
     IOleControl,
     IOleWindow,
+    IObjectSafety,
     IDataObject,
     IObjectWithSite,
     IOleInPlaceActiveObject,
     IOleInPlaceObject,
     IOleInPlaceObjectWindowless,
     IQuickActivate,
-    IServiceProvider,
+    DirectN.IServiceProvider,
     IProvideClassInfo,
     IPersistStreamInit,
     IViewObject2,
@@ -35,8 +34,6 @@ public abstract partial class BaseControl : BaseDispatch,
     private IComObject<IAdviseSink>? _adviseSink;
     private IComObject<IAdviseSinkEx>? _adviseSinkEx;
     private bool _isDirty;
-    private bool _inPlaceActive;
-    private bool _uiActive;
     private SIZE _extent;
     private int _freezeCount;
     private Window? _window;
@@ -44,39 +41,128 @@ public abstract partial class BaseControl : BaseDispatch,
     protected BaseControl()
     {
         TracingUtilities.Trace($"Created {GetType().FullName} ({GetType().GUID:B})");
+        CurrentSafetyOptions = SupportedSafetyOptions;
         Functions.CreateOleAdviseHolder(out var obj).ThrowOnError();
         _adviseHolder = new ComObject<IOleAdviseHolder>(obj);
         _connectionPoint = new PropertyNotifySinkConnectionPoint();
         AddConnectionPoint(_connectionPoint);
     }
 
+    protected abstract Window CreateWindow(HWND parentHandle, RECT rect);
+
     protected virtual POINTERINACTIVE PointerActivationPolicy => POINTERINACTIVE.POINTERINACTIVE_ACTIVATEONENTRY;
     protected virtual OLEMISC MiscStatus => OLEMISC.OLEMISC_RECOMPOSEONRESIZE | OLEMISC.OLEMISC_CANTLINKINSIDE | OLEMISC.OLEMISC_INSIDEOUT | OLEMISC.OLEMISC_ACTIVATEWHENVISIBLE | OLEMISC.OLEMISC_SETCLIENTSITEFIRST;
     protected virtual VIEWSTATUS ViewStatus => VIEWSTATUS.VIEWSTATUS_OPAQUE | VIEWSTATUS.VIEWSTATUS_SOLIDBKGND;
+    protected virtual uint SupportedSafetyOptions => Constants.INTERFACESAFE_FOR_UNTRUSTED_CALLER | Constants.INTERFACESAFE_FOR_UNTRUSTED_DATA;
+    protected virtual uint CurrentSafetyOptions { get; set; }
     protected virtual Window? Window => _window;
     protected override HWND GetWindowHandle() => _window?.Handle ?? HWND.Null;
+    protected virtual ControlState State { get; private set; }
+
+    protected virtual void ChangeState(ControlState newState)
+    {
+        TracingUtilities.Trace($"Changing state from {State} to {newState}");
+        if (newState == State)
+            return;
+
+        var oldState = State;
+        State = newState;
+        switch (newState)
+        {
+            case ControlState.InplaceActive:
+                _inPlaceSite?.Object.OnInPlaceActivate().ThrowOnError();
+                if (oldState == ControlState.UIActive)
+                {
+                    _inPlaceSite?.Object.OnUIDeactivate(false).ThrowOnError();
+                }
+                break;
+
+            case ControlState.Active:
+                // nothing to do
+                break;
+
+            case ControlState.UIActive:
+                _inPlaceSite?.Object.OnUIActivate().ThrowOnError();
+                break;
+
+            case ControlState.Running:
+                if (oldState == ControlState.UIActive)
+                {
+                    _inPlaceSite?.Object.OnUIDeactivate(false).ThrowOnError();
+                    _inPlaceSite?.Object.OnInPlaceDeactivate().ThrowOnError();
+                }
+                else if (oldState == ControlState.InplaceActive)
+                {
+                    _inPlaceSite?.Object.OnInPlaceDeactivate().ThrowOnError();
+                }
+                break;
+        }
+    }
+
+    protected virtual HRESULT UIActivate(HWND hwndParent, RECT pos)
+    {
+        ChangeState(ControlState.UIActive);
+        return Constants.S_OK;
+    }
+
+    protected virtual HRESULT DiscardUndoState(HWND hwndParent, RECT pos) => NotImplemented();
+
+    protected virtual HRESULT InplaceActivate(HWND hwndParent, RECT pos)
+    {
+        var window = EnsureWindow(hwndParent, pos);
+        TracingUtilities.Trace($"window: {window}");
+
+        if (_inPlaceSite != null)
+        {
+            TracingUtilities.Trace($"calling OnInPlaceActivate");
+            _inPlaceSite.Object.OnInPlaceActivate().ThrowOnError();
+
+            // in the case of hosted in VS, if .NET < 10, this fails if the control has no parent (Winforms Control)
+            //var info = new OLEINPLACEFRAMEINFO { cb = (uint)sizeof(OLEINPLACEFRAMEINFO) };
+            //_inPlaceSite.Object.GetWindowContext(out var frameObj, out var uiWindowObj, out var rcPos, out var clip, ref info).ThrowOnError();
+            //using var frame = frameObj != null ? new ComObject<IOleInPlaceFrame>(frameObj) : null;
+            //using var uiWindow = uiWindowObj != null ? new ComObject<IOleInPlaceUIWindow>(uiWindowObj) : null;
+            //TracingUtilities.Trace($"frameObj: {frame} uiWindo: {uiWindow} rcPos: {rcPos} clip: {clip} info hwnd: {info.hwndFrame}");
+        }
+
+        //pActiveSite.ShowObject().ThrowOnError();
+        ChangeState(ControlState.InplaceActive);
+        return Constants.S_OK;
+    }
+
+    protected virtual HRESULT Open(HWND hwndParent, RECT pos)
+    {
+        TracingUtilities.Trace($"hwndParent: {hwndParent} pos: {pos}");
+        return InplaceActivate(hwndParent, pos);
+    }
+
+    protected virtual HRESULT Hide(HWND hwndParent, RECT pos)
+    {
+        TracingUtilities.Trace($"hwndParent: {hwndParent} pos: {pos}");
+        ChangeState(ControlState.Running);
+        return Constants.S_OK;
+    }
+
+    protected virtual WINDOW_STYLE GetDefaultWindowStyle(HWND parentHandle)
+    {
+        var style = WINDOW_STYLE.WS_VISIBLE | WINDOW_STYLE.WS_CLIPCHILDREN | WINDOW_STYLE.WS_CLIPSIBLINGS;
+        if (parentHandle == HWND.Null)
+        {
+            style |= WINDOW_STYLE.WS_POPUP;
+        }
+        else
+        {
+            style |= WINDOW_STYLE.WS_CHILD;
+        }
+        return style;
+    }
 
     protected virtual Window? EnsureWindow(HWND parentHandle, RECT rect) => TracingUtilities.WrapErrors(() =>
     {
         TracingUtilities.Trace($"parentHandle: {parentHandle} rect: {rect} window: {_window} null: {_window == null}");
         if (_window == null)
         {
-            var style = WINDOW_STYLE.WS_VISIBLE | WINDOW_STYLE.WS_CLIPCHILDREN | WINDOW_STYLE.WS_CLIPSIBLINGS;
-            if (parentHandle == HWND.Null)
-            {
-                style |= WINDOW_STYLE.WS_POPUP;
-            }
-            else
-            {
-                style |= WINDOW_STYLE.WS_CHILD;
-            }
-
-            var window = new Window
-            (
-                style: style,
-                rect: rect,
-                parentHandle: parentHandle
-            );
+            var window = CreateWindow(parentHandle, rect);
             window.Show();
             _window = window;
         }
@@ -265,7 +351,6 @@ public abstract partial class BaseControl : BaseDispatch,
     unsafe HRESULT IOleObject.DoVerb(int iVerb, nint lpmsg, IOleClientSite pActiveSite, int lindex, HWND hwndParent, nint lprcPosRect) => TracingUtilities.WrapErrors(() =>
     {
         var verb = (OLEIVERB)iVerb;
-        var hr = Constants.S_OK;
 
         // default if no rect provided
         var pos = RECT.Sized(0, 0, 100, 100);
@@ -276,27 +361,15 @@ public abstract partial class BaseControl : BaseDispatch,
         }
 
         TracingUtilities.Trace($"iVerb: {verb} lpmsg: {lpmsg} pActiveSite: {pActiveSite} lindex: {lindex} hwndParent: {hwndParent} lprcPosRect: {pos}");
-        if (verb == OLEIVERB.OLEIVERB_INPLACEACTIVATE)
+        var hr = verb switch
         {
-            var window = EnsureWindow(hwndParent, pos);
-            TracingUtilities.Trace($"window: {window}");
-
-            if (_inPlaceSite != null)
-            {
-                TracingUtilities.Trace($"calling OnInPlaceActivate");
-                _inPlaceSite.Object.OnInPlaceActivate().ThrowOnError();
-
-                // in the case of hosted in VS, if .NET < 10, this fails if the control has no parent (Winforms Control)
-                //var info = new OLEINPLACEFRAMEINFO { cb = (uint)sizeof(OLEINPLACEFRAMEINFO) };
-                //_inPlaceSite.Object.GetWindowContext(out var frameObj, out var uiWindowObj, out var rcPos, out var clip, ref info).ThrowOnError();
-                //using var frame = frameObj != null ? new ComObject<IOleInPlaceFrame>(frameObj) : null;
-                //using var uiWindow = uiWindowObj != null ? new ComObject<IOleInPlaceUIWindow>(uiWindowObj) : null;
-                //TracingUtilities.Trace($"frameObj: {frame} uiWindo: {uiWindow} rcPos: {rcPos} clip: {clip} info hwnd: {info.hwndFrame}");
-            }
-
-            pActiveSite.ShowObject().ThrowOnError();
-            _inPlaceActive = true;
-        }
+            OLEIVERB.OLEIVERB_INPLACEACTIVATE => InplaceActivate(hwndParent, pos),
+            OLEIVERB.OLEIVERB_SHOW or OLEIVERB.OLEIVERB_PRIMARY or OLEIVERB.OLEIVERB_OPEN => Open(hwndParent, pos),
+            OLEIVERB.OLEIVERB_HIDE => Hide(hwndParent, pos),
+            OLEIVERB.OLEIVERB_UIACTIVATE => UIActivate(hwndParent, pos),
+            OLEIVERB.OLEIVERB_DISCARDUNDOSTATE => DiscardUndoState(hwndParent, pos),
+            _ => Constants.E_NOTIMPL,
+        };
         TracingUtilities.Trace($"hr: {hr}");
         return hr;
     });
@@ -310,7 +383,17 @@ public abstract partial class BaseControl : BaseDispatch,
 
     HRESULT IOleObject.Update() => NotImplemented();
     HRESULT IOleObject.IsUpToDate() => NotImplemented();
-    HRESULT IOleObject.GetUserClassID(out Guid pClsid) { pClsid = new(); return NotImplemented(); }
+    HRESULT IOleObject.GetUserClassID(out Guid pClsid)
+    {
+        var clsid = Guid.Empty;
+        var hr = TracingUtilities.WrapErrors(() =>
+        {
+            clsid = GetType().GUID;
+            return Constants.S_OK;
+        });
+        pClsid = clsid;
+        return hr;
+    }
 
     HRESULT IOleObject.GetUserType(uint dwFormOfType, out PWSTR pszUserType)
     {
@@ -484,6 +567,9 @@ public abstract partial class BaseControl : BaseDispatch,
         nuint dwContinue) => TracingUtilities.WrapErrors(() =>
     {
         TracingUtilities.Trace($"dwDrawAspect: {dwDrawAspect} lindex: {lindex} pvAspect: {pvAspect} ptd: {ptd} hdcTargetDev: {hdcTargetDev} hdcDraw: {hdcDraw} lprcBounds: {lprcBounds} lprcWBounds: {lprcWBounds} pfnContinue: {pfnContinue} dwContinue: {dwContinue}");
+        if (dwDrawAspect == DVASPECT.DVASPECT_DOCPRINT)
+            return Constants.DV_E_DVASPECT;
+
         return Constants.S_OK;
     });
 
@@ -495,7 +581,7 @@ public abstract partial class BaseControl : BaseDispatch,
         _adviseSink?.Dispose();
         _adviseSink = pAdvSink != null ? new ComObject<IAdviseSink>(pAdvSink) : null;
         _adviseSinkEx?.Dispose();
-        _adviseSinkEx = _adviseSink.As<IAdviseSinkEx>();
+        _adviseSinkEx = pAdvSink != null ? new ComObject<IAdviseSinkEx>(pAdvSink) : null;
         TracingUtilities.Trace($"Sink: {_adviseSink}");
         TracingUtilities.Trace($"SinkEx: {_adviseSinkEx}");
         return Constants.S_OK;
@@ -554,7 +640,28 @@ public abstract partial class BaseControl : BaseDispatch,
     }
 
     HRESULT IViewObjectEx.QueryHitRect(uint dwAspect, in RECT pRectBounds, in RECT pRectLoc, int lCloseHint, out uint pHitResult) { pHitResult = 0; return NotImplemented(); }
-    HRESULT IViewObjectEx.GetNaturalExtent(DVASPECT dwAspect, int lindex, nint ptd, HDC hicTargetDev, nint pExtentInfo, nint pSizel) { return NotImplemented(); }
+    unsafe HRESULT IViewObjectEx.GetNaturalExtent(DVASPECT dwAspect, int lindex, nint ptd, HDC hicTargetDev, nint pExtentInfo, nint pSizel) => TracingUtilities.WrapErrors(() =>
+    {
+        TracingUtilities.Trace($"dwAspect: {dwAspect} lindex: {lindex} ptd: {ptd} hicTargetDev: {hicTargetDev} pExtentInfo: {pExtentInfo} pSizel: {pSizel}");
+        if (pSizel == 0 || pExtentInfo == 0)
+            return Constants.E_POINTER;
+
+        if (dwAspect != DVASPECT.DVASPECT_CONTENT)
+            return Constants.DV_E_DVASPECT;
+
+        var size = new SIZE { cx = 1000, cy = 1000 };
+        *(SIZE*)pSizel = size;
+        TracingUtilities.Trace($"sizel: {size}");
+
+        var extentInfo = *(DVEXTENTINFO*)pExtentInfo;
+        var mode = (DVEXTENTMODE)extentInfo.dwExtentMode;
+        TracingUtilities.Trace($"extentInfo sizelProposed: {extentInfo.sizelProposed} mode: {mode}");
+
+        var p = (SIZE*)pSizel;
+        p->cx = -1;
+        p->cy = -1;
+        return Constants.S_OK;
+    });
 
     HRESULT IOleControl.GetControlInfo(ref CONTROLINFO pCI) { pCI = new(); return NotImplemented(); }
     HRESULT IOleControl.OnMnemonic(in MSG pMsg)
@@ -704,15 +811,18 @@ public abstract partial class BaseControl : BaseDispatch,
     HRESULT IOleInPlaceActiveObject.EnableModeless(BOOL fEnable) => NotImplemented();
     HRESULT IOleInPlaceObject.InPlaceDeactivate() => TracingUtilities.WrapErrors(() =>
     {
-        TracingUtilities.Trace($"inPlaceActive : {_inPlaceActive} uiActive: {_uiActive}");
-        _inPlaceActive = false;
+        TracingUtilities.Trace($"State: {State}");
+        ChangeState(ControlState.Running);
         return Constants.S_OK;
     });
 
     HRESULT IOleInPlaceObject.UIDeactivate() => TracingUtilities.WrapErrors(() =>
     {
-        TracingUtilities.Trace($"inPlaceActive : {_inPlaceActive} uiActive: {_uiActive}");
-        _uiActive = false;
+        TracingUtilities.Trace($"State: {State}");
+        if (State != ControlState.Running)
+        {
+            ChangeState(ControlState.InplaceActive);
+        }
         return Constants.S_OK;
     });
 
@@ -774,7 +884,7 @@ public abstract partial class BaseControl : BaseDispatch,
                 _adviseSink?.Dispose();
                 _adviseSink = DirectN.Extensions.Com.ComObject.FromPointer<IAdviseSink>(container.pAdviseSink);
                 _adviseSinkEx?.Dispose();
-                _adviseSinkEx = _adviseSink.As<IAdviseSinkEx>();
+                _adviseSinkEx = DirectN.Extensions.Com.ComObject.FromPointer<IAdviseSinkEx>(container.pAdviseSink);
             }
 
             TracingUtilities.Trace($"Sink: {_adviseSink}");
@@ -814,7 +924,7 @@ public abstract partial class BaseControl : BaseDispatch,
         return hr;
     }
 
-    HRESULT IServiceProvider.QueryService(in Guid guidService, in Guid riid, out nint ppvObject)
+    HRESULT DirectN.IServiceProvider.QueryService(in Guid guidService, in Guid riid, out nint ppvObject)
     {
         var obj = nint.Zero;
         var siid = guidService;
@@ -847,6 +957,35 @@ public abstract partial class BaseControl : BaseDispatch,
         var hr = TracingUtilities.WrapErrors(() =>
         {
             TracingUtilities.Trace($"iid: {iid.GetName()}");
+            return Constants.S_OK;
+        });
+        return hr;
+    }
+
+    HRESULT IObjectSafety.GetInterfaceSafetyOptions(in Guid riid, out uint pdwSupportedOptions, out uint pdwEnabledOptions)
+    {
+        var iid = riid;
+        var supportedOptions = 0u;
+        var enabledOptions = 0u;
+        var hr = TracingUtilities.WrapErrors(() =>
+        {
+            TracingUtilities.Trace($"iid: {iid.GetName()}");
+            supportedOptions = SupportedSafetyOptions;
+            enabledOptions = CurrentSafetyOptions;
+            return Constants.S_OK;
+        });
+        pdwSupportedOptions = supportedOptions;
+        pdwEnabledOptions = enabledOptions;
+        return hr;
+    }
+
+    HRESULT IObjectSafety.SetInterfaceSafetyOptions(in Guid riid, uint dwOptionSetMask, uint dwEnabledOptions)
+    {
+        var iid = riid;
+        var hr = TracingUtilities.WrapErrors(() =>
+        {
+            TracingUtilities.Trace($"iid: {iid.GetName()} dwOptionSetMask:{dwOptionSetMask} dwEnabledOptions:{dwEnabledOptions}");
+            CurrentSafetyOptions = dwEnabledOptions; // we currently do no check on all this
             return Constants.S_OK;
         });
         return hr;
