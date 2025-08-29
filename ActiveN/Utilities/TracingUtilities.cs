@@ -58,12 +58,12 @@ public static class TracingUtilities
         EventProvider.Default.WriteMessageEvent($"[{Environment.CurrentManagedThreadId}]{name}:: {methodName}: {text}");
     }
 
-    public static uint WrapErrors(this Func<HRESULT> action, Action? actionOnError = null)
+    public static T? WrapErrors<T>(this Func<T> action, Action? actionOnError = null)
     {
         ArgumentNullException.ThrowIfNull(action);
         try
         {
-            return (uint)action();
+            return action();
         }
         catch (SecurityException se)
         {
@@ -81,7 +81,16 @@ public static class TracingUtilities
                     // continue;
                 }
             }
-            return (uint)Constants.E_ACCESSDENIED;
+            if (typeof(T) == typeof(uint))
+                return (T)(object)(uint)Constants.E_ACCESSDENIED;
+
+            if (typeof(T) == typeof(int))
+                return (T)(object)(int)Constants.E_ACCESSDENIED;
+
+            if (typeof(T) == typeof(HRESULT))
+                return (T)(object)Constants.E_ACCESSDENIED;
+
+            return default;
         }
         catch (Exception ex)
         {
@@ -98,7 +107,16 @@ public static class TracingUtilities
                     // continue;
                 }
             }
-            return (uint)ex.HResult;
+            if (typeof(T) == typeof(uint))
+                return (T)(object)(uint)ex.HResult;
+
+            if (typeof(T) == typeof(int))
+                return (T)(object)ex.HResult;
+
+            if (typeof(T) == typeof(HRESULT))
+                return (T)(object)(HRESULT)ex.HResult;
+
+            return default;
         }
     }
 
