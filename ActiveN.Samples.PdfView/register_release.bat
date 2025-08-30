@@ -1,0 +1,1 @@
+regsvr32 ActiveN.Samples.PdfView.dll /i:user /n

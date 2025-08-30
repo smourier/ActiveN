@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActiveN", "ActiveN\ActiveN.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActiveN.Samples.HelloWorld", "ActiveN.Samples.HelloWorld\ActiveN.Samples.HelloWorld.csproj", "{159340C0-ABFA-4296-9F23-4C7292E77387}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActiveN.Samples.PdfView", "ActiveN.Samples.PdfView\ActiveN.Samples.PdfView.csproj", "{5AC7E975-EC6A-B0A7-FF6C-B065B5FD9B8D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM64 = Debug|ARM64
@@ -41,6 +43,18 @@ Global
 		{159340C0-ABFA-4296-9F23-4C7292E77387}.Release|x64.Build.0 = Release|x64
 		{159340C0-ABFA-4296-9F23-4C7292E77387}.Release|x86.ActiveCfg = Release|x86
 		{159340C0-ABFA-4296-9F23-4C7292E77387}.Release|x86.Build.0 = Release|x86
+		{5AC7E975-EC6A-B0A7-FF6C-B065B5FD9B8D}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{5AC7E975-EC6A-B0A7-FF6C-B065B5FD9B8D}.Debug|ARM64.Build.0 = Debug|ARM64
+		{5AC7E975-EC6A-B0A7-FF6C-B065B5FD9B8D}.Debug|x64.ActiveCfg = Debug|x64
+		{5AC7E975-EC6A-B0A7-FF6C-B065B5FD9B8D}.Debug|x64.Build.0 = Debug|x64
+		{5AC7E975-EC6A-B0A7-FF6C-B065B5FD9B8D}.Debug|x86.ActiveCfg = Debug|x86
+		{5AC7E975-EC6A-B0A7-FF6C-B065B5FD9B8D}.Debug|x86.Build.0 = Debug|x86
+		{5AC7E975-EC6A-B0A7-FF6C-B065B5FD9B8D}.Release|ARM64.ActiveCfg = Release|ARM64
+		{5AC7E975-EC6A-B0A7-FF6C-B065B5FD9B8D}.Release|ARM64.Build.0 = Release|ARM64
+		{5AC7E975-EC6A-B0A7-FF6C-B065B5FD9B8D}.Release|x64.ActiveCfg = Release|x64
+		{5AC7E975-EC6A-B0A7-FF6C-B065B5FD9B8D}.Release|x64.Build.0 = Release|x64
+		{5AC7E975-EC6A-B0A7-FF6C-B065B5FD9B8D}.Release|x86.ActiveCfg = Release|x86
+		{5AC7E975-EC6A-B0A7-FF6C-B065B5FD9B8D}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

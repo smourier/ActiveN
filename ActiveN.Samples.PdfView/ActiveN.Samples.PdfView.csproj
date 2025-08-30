@@ -1,0 +1,187 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net9.0-windows10.0.22621.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<PublishAot>true</PublishAot>
+		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+		<IsAotCompatible>true</IsAotCompatible>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<Platforms>x64;x86;ARM64</Platforms>
+
+		<!-- this is needed to generate a .runtimeconfig.json file (for DEBUG mode) -->
+		<EnableDynamicLoading>true</EnableDynamicLoading>
+
+		<!-- https://github.com/dotnet/runtime/blob/main/docs/workflow/trimming/feature-switches.md -->
+		<!-- this is needed for the .NET dll (not AOT published) to be loaded by the native thunk dll -->
+		<!-- specifying this with RuntimeHostConfigurationOption doesn't seem to work -->
+		<_EnableConsumingManagedCodeFromNativeHosting>true</_EnableConsumingManagedCodeFromNativeHosting>
+
+		<!-- this is needed for AOT trimming to keep ProgId attributes -->
+		<!-- https://github.com/dotnet/runtime/blob/main/src/libraries/System.Private.CoreLib/src/ILLink/ILLink.LinkAttributes.Shared.xml -->
+		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+
+		<Company>Simon Mourier</Company>
+		<Description>A sample for ActiveN framework (for building ActiveX controls in .NET Core AOT).</Description>
+		<Product>ActiveN</Product>
+		<AssemblyTitle>ActiveN.Samples.PdfView</AssemblyTitle>
+		<Copyright>Copyright (C) 2024-2025 Simon Mourier. All rights reserved.</Copyright>
+		<FileVersion>1.0.0.0</FileVersion>
+		<InformationalVersion>1.0.0.0</InformationalVersion>
+		<ProductVersion>1.0.0.0</ProductVersion>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Remove="ActiveN.Samples.PdfView.bmp" />
+		<None Remove="ActiveN.Samples.PdfView.idl" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\ActiveN\ActiveN.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Reference Include="DirectN">
+			<HintPath>..\ActiveN\External\DirectN.dll</HintPath>
+		</Reference>
+		<Reference Include="DirectN.Extensions">
+			<HintPath>..\ActiveN\External\DirectN.Extensions.dll</HintPath>
+		</Reference>
+	</ItemGroup>
+
+	<Target Name="AotNetComHost" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">
+		<ItemGroup>
+			<AotNetComHost Include="$(ProjectDir)..\ActiveN\External\AotNetComHost.$(Platform).dll" />
+		</ItemGroup>
+		<Copy SourceFiles="@(AotNetComHost)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+		<Move ContinueOnError="false" SourceFiles="$(OutDir)AotNetComHost.$(Platform).dll" DestinationFiles="$(OutDir)$(AssemblyName).comthunk.dll" />
+	</Target>
+
+	<ItemGroup>
+		<Using Include="ActiveN" />
+		<Using Include="ActiveN.Hosting" />
+		<Using Include="ActiveN.Utilities" />
+		<Using Include="DirectN" />
+		<Using Include="DirectN.Extensions" />
+		<Using Include="DirectN.Extensions.Com" />
+		<Using Include="DirectN.Extensions.Utilities" />
+		<Using Include="Microsoft.Win32" />
+		<Using Include="System" />
+		<Using Include="System.ComponentModel" />
+		<Using Include="System.Diagnostics" />
+		<Using Include="System.Diagnostics.CodeAnalysis" />
+		<Using Include="System.IO" />
+		<Using Include="System.Linq" />
+		<Using Include="System.Reflection" />
+		<Using Include="System.Runtime.CompilerServices" />
+		<Using Include="System.Runtime.InteropServices" />
+		<Using Include="System.Runtime.InteropServices.Marshalling" />
+		<Using Include="System.Runtime.Versioning" />
+		<Using Include="System.Security" />
+		<Using Include="System.Threading.Tasks" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Update="register_debug.bat">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="register_release.bat">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="unregister_debug.bat">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="unregister_release.bat">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+
+	<Import Project="..\ActiveN\GetWindowsSDKPaths.targets" />
+
+	<ItemGroup>
+		<AvailableItemName Include="Midl" />
+		<AvailableItemName Include="ToolBoxBitmap32" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Compile Include="..\ActiveN\GlobalSuppressions.cs" Link="GlobalSuppressions.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Midl Include="ActiveN.Samples.PdfView.idl" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ToolBoxBitmap32 Include="ActiveN.Samples.PdfView.bmp" />
+	</ItemGroup>
+
+	<!-- builds TLBs from IDL files in a C# project. Needs GetWindowsSDKPaths.targets in the same directory as this file -->
+	<Target Name="GenerateTlbs" BeforeTargets="BeforeBuild" Condition="@(Midl) != ''">
+		<GetWindowsSDKPaths>
+			<Output TaskParameter="SdkBinPath" ItemName="WindowsSDKBinPath" />
+			<Output TaskParameter="VsInstallPath" ItemName="VsInstallPath" />
+		</GetWindowsSDKPaths>
+		<MakeDir Directories="$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)$(Platform)\tlb" />
+
+		<PropertyGroup>
+			<MidlEnv Condition="'$(Platform)' == 'x64'">x64</MidlEnv>
+			<MidlEnv Condition="'$(Platform)' == 'x86'">win32</MidlEnv>
+			<RcFileFlags Condition="'$(Configuration)' == 'Debug'">0x1L</RcFileFlags>
+			<RcFileFlags Condition="'$(Configuration)' != 'Debug'">0x0L</RcFileFlags>
+		</PropertyGroup>
+
+		<Exec Command="call &quot;@(VsInstallPath)\VC\Auxiliary\Build\vcvars64.bat&quot;&#xD;&#xA;&quot;@(WindowsSDKBinPath)\midl.exe&quot; /env $(MidlEnv) &quot;%(Midl.FullPath)&quot; /out &quot;$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)$(Platform)\tlb&quot;" />
+		<Copy SourceFiles="$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)$(Platform)\tlb\%(Midl.FileName).tlb" DestinationFolder="$(MSBuildProjectDirectory)\$(OutputPath)" />
+
+		<!-- build a .rc, rebuild version resource -->
+		<PropertyGroup>
+			<TypeLibRc>
+				1 TYPELIB %(Midl.FileName).tlb
+				1 VERSIONINFO
+					FILEVERSION $([System.String]::new('$(FileVersion)').Replace('.',','))
+					PRODUCTVERSION $([System.String]::new('$(ProductVersion)').Replace('.',','))
+					FILEFLAGSMASK 0x3fL
+					FILEFLAGS $(RcFileFlags)
+					FILEOS 0x40004L
+					FILETYPE 0x2L
+					FILESUBTYPE 0x0L
+				BEGIN
+					BLOCK "StringFileInfo"
+					BEGIN
+				        BLOCK "040904b0"
+						BEGIN
+							VALUE "CompanyName", "$(Company)"
+							VALUE "FileDescription", "$(Description)"
+							VALUE "FileVersion", "$(FileVersion)"
+							VALUE "InternalName", "$(AssemblyTitle).dll"
+							VALUE "LegalCopyright", "$(Copyright)"
+							VALUE "OriginalFilename", "$(AssemblyTitle).dll"
+							VALUE "ProductName", "$(Product)"
+							VALUE "ProductVersion", "$(ProductVersion)"
+						END
+					END
+					BLOCK "VarFileInfo"
+					BEGIN
+						VALUE "Translation", 0x409, 1200
+					END
+				END
+			</TypeLibRc>
+
+			<BitmapRc>
+				1 BITMAP %(ToolBoxBitmap32.FileName).bmp
+			</BitmapRc>
+			
+		</PropertyGroup>
+		<WriteLinesToFile File="$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)$(Platform)\tlb\%(Midl.FileName).rc" Overwrite="true" Lines="$(TypeLibRc)" />
+		<WriteLinesToFile File="$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)$(Platform)\tlb\%(Midl.FileName).rc" Condition="@(ToolBoxBitmap32) != ''" Lines="$(BitmapRc)" />
+
+		<!-- compiles the .rc into a .res -->
+		<Exec Command="call &quot;@(WindowsSDKBinPath)\rc.exe&quot; &quot;$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)$(Platform)\tlb\%(Midl.FileName).rc&quot;" />
+
+		<PropertyGroup>
+			<Win32Resource>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)$(Platform)\tlb\%(Midl.FileName).res</Win32Resource>
+		</PropertyGroup>
+
+	</Target>
+
+</Project>

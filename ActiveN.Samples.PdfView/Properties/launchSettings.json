@@ -1,0 +1,32 @@
+{
+  "profiles": {
+    "Unregister64": {
+      "commandName": "Executable",
+      "executablePath": "regsvr32",
+      "commandLineArgs": "ActiveN.Samples.PdfView.comthunk.dll /i:user /n /u",
+      "workingDirectory": "E:\\smo\\GitHub\\ActiveN\\ActiveN.Samples.PdfView\\bin\\x64\\Debug\\net9.0-windows10.0.22621.0",
+      "nativeDebugging": true
+    },
+    "Register64": {
+      "commandName": "Executable",
+      "executablePath": "regsvr32",
+      "commandLineArgs": "ActiveN.Samples.PdfView.comthunk.dll /i:user /n ",
+      "workingDirectory": "E:\\smo\\GitHub\\ActiveN\\ActiveN.Samples.PdfView\\bin\\x64\\Debug\\net9.0-windows10.0.22621.0",
+      "nativeDebugging": true
+    },
+    "Unregister32": {
+      "commandName": "Executable",
+      "executablePath": "regsvr32",
+      "commandLineArgs": "ActiveN.Samples.PdfView.comthunk.dll /i:user /n /u",
+      "workingDirectory": "E:\\smo\\GitHub\\ActiveN\\ActiveN.Samples.PdfView\\bin\\x86\\Debug\\net9.0-windows10.0.22621.0",
+      "nativeDebugging": true
+    },
+    "Register32": {
+      "commandName": "Executable",
+      "executablePath": "regsvr32",
+      "commandLineArgs": "ActiveN.Samples.PdfView.comthunk.dll /i:user /n ",
+      "workingDirectory": "E:\\smo\\GitHub\\ActiveN\\ActiveN.Samples.PdfView\\bin\\x86\\Debug\\net9.0-windows10.0.22621.0",
+      "nativeDebugging": true
+    }
+  }
+}

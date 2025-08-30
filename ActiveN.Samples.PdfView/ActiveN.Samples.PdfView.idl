@@ -1,0 +1,44 @@
+﻿#include "olectl.h"
+import "oaidl.idl";
+import "ocidl.idl";
+
+// TODO: generate other uuids
+[
+	uuid(99b893cf-4784-4dc0-82da-adff802b87dd),
+	version(1.0),
+	helpstring("ActiveN.Samples.PdfView 1.0 Type Library")
+]
+library ActiveNSamplesPdfViewLib
+{
+	importlib("stdole2.tlb");
+
+	[
+		object,
+		uuid(63b16fe2-2faa-4498-9c3e-023e720f8cae),
+		dual,
+		nonextensible,
+		pointer_default(unique),
+		helpstring("IPdfViewControl Interface"),
+	]
+	interface IPdfViewControl : IDispatch
+	{
+		// these are standard properties for ActiveX controls (declared olectl.h)
+		[propput, bindable, requestedit, id(DISPID_ENABLED)]
+		HRESULT Enabled([in]VARIANT_BOOL vbool);
+
+		[propget, bindable, requestedit, id(DISPID_ENABLED)]
+			HRESULT Enabled([out, retval]VARIANT_BOOL* pbool);
+
+		[propget, bindable, requestedit, id(DISPID_HWND)]
+			HRESULT HWND([out, retval]LONG_PTR* pHWND);
+	};
+
+	[
+		uuid(d1803953-c348-426e-bd42-5c47f26d9caa),
+		helpstring("PdfViewControl Class")
+	]
+		coclass PdfViewControl
+	{
+		[default] interface IPdfViewControl;
+	}
+}
