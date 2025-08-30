@@ -7,11 +7,12 @@
 [DisplayName("ActiveN Hello World Control")]
 [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)]
 [GeneratedComClass]
-#pragma warning disable CA1822 // Mark members as static; no since we're dealing with COM instance methods & properties
 public partial class HelloWorldControl : BaseControl, IHelloWorldControl
 {
+    #region Mandatory ovrerrides
     protected override ComRegistration ComRegistration => ComHosting.Instance;
     protected override Window CreateWindow(HWND parentHandle, RECT rect) => new HelloWorldWindow(parentHandle, GetDefaultWindowStyle(parentHandle), rect);
+    #endregion
 
     // note this is necesary to avoid trimming Task<T>.Result for AOT publishing
     // all Task<T> results should be unwrapped here
@@ -23,6 +24,9 @@ public partial class HelloWorldControl : BaseControl, IHelloWorldControl
 
         return null;
     }
+
+    #region IDispatch implementation, static (IDL/TLB) and dynamic (reflection)
+#pragma warning disable CA1822 // Mark members as static; no since we're dealing with COM instance methods & properties
 
     // COM visible public properties exposed through IHelloWorldControl IDL should go here
     public HRESULT CurrentDateTime(out double ret)
@@ -67,17 +71,10 @@ public partial class HelloWorldControl : BaseControl, IHelloWorldControl
         return Constants.S_OK;
     }
 
-    HRESULT IDispatch.GetIDsOfNames(in Guid riid, PWSTR[] rgszNames, uint cNames, uint lcid, int[] rgDispId) =>
-        GetIDsOfNames(in riid, rgszNames, cNames, lcid, rgDispId);
+#pragma warning restore CA1822 // Mark members as static
+    #endregion
 
-    HRESULT IDispatch.Invoke(int dispIdMember, in Guid riid, uint lcid, DISPATCH_FLAGS wFlags, in DISPPARAMS pDispParams, nint pVarResult, nint pExcepInfo, nint puArgErr) =>
-        Invoke(dispIdMember, riid, lcid, wFlags, pDispParams, pVarResult, pExcepInfo, puArgErr);
-
-    HRESULT IDispatch.GetTypeInfo(uint iTInfo, uint lcid, out ITypeInfo ppTInfo) =>
-        GetTypeInfo(iTInfo, lcid, out ppTInfo);
-
-    HRESULT IDispatch.GetTypeInfoCount(out uint pctinfo) =>
-        GetTypeInfoCount(out pctinfo);
+    #region COM Registration support
 
     // COM registration
     public static new HRESULT RegisterType(ComRegistrationContext context)
@@ -91,5 +88,22 @@ public partial class HelloWorldControl : BaseControl, IHelloWorldControl
         TracingUtilities.Trace($"Unregister type {typeof(HelloWorldControl).FullName}...");
         return BaseControl.UnregisterType(context);
     }
+
+    #endregion
+
+    #region IDispatch support
+
+    HRESULT IDispatch.GetIDsOfNames(in Guid riid, PWSTR[] rgszNames, uint cNames, uint lcid, int[] rgDispId) =>
+        GetIDsOfNames(in riid, rgszNames, cNames, lcid, rgDispId);
+
+    HRESULT IDispatch.Invoke(int dispIdMember, in Guid riid, uint lcid, DISPATCH_FLAGS wFlags, in DISPPARAMS pDispParams, nint pVarResult, nint pExcepInfo, nint puArgErr) =>
+        Invoke(dispIdMember, riid, lcid, wFlags, pDispParams, pVarResult, pExcepInfo, puArgErr);
+
+    HRESULT IDispatch.GetTypeInfo(uint iTInfo, uint lcid, out ITypeInfo ppTInfo) =>
+        GetTypeInfo(iTInfo, lcid, out ppTInfo);
+
+    HRESULT IDispatch.GetTypeInfoCount(out uint pctinfo) =>
+        GetTypeInfoCount(out pctinfo);
+
+    #endregion
 }
-#pragma warning restore CA1822 // Mark members as static

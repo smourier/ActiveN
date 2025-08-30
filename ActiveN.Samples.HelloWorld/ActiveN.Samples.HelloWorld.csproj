@@ -96,7 +96,7 @@
 		</None>
 	</ItemGroup>
 
-	<Import Project="GetWindowsSDKPaths.targets" />
+	<Import Project="..\ActiveN\GetWindowsSDKPaths.targets" />
 
 	<ItemGroup>
 		<AvailableItemName Include="Midl" />
