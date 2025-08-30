@@ -9,7 +9,7 @@
 [GeneratedComClass]
 public partial class HelloWorldControl : BaseControl, IHelloWorldControl
 {
-    #region Mandatory ovrerrides
+    #region Mandatory overrides
     protected override ComRegistration ComRegistration => ComHosting.Instance;
     protected override Window CreateWindow(HWND parentHandle, RECT rect) => new HelloWorldWindow(parentHandle, GetDefaultWindowStyle(parentHandle), rect);
     #endregion
@@ -29,19 +29,22 @@ public partial class HelloWorldControl : BaseControl, IHelloWorldControl
 #pragma warning disable CA1822 // Mark members as static; no since we're dealing with COM instance methods & properties
 
     // COM visible public properties exposed through IHelloWorldControl IDL should go here
-    public HRESULT CurrentDateTime(out double ret)
-    {
-        ret = DateTime.Now.ToOADate();
-        return Constants.S_OK;
-    }
+    public DateTime CurrentDate => DateTime.Now;
+    HRESULT IHelloWorldControl.get_CurrentDateTime(out double value) { value = CurrentDate.ToOADate(); return Constants.S_OK; }
 
-    public HRESULT HWND(out nint ret)
-    {
-        ret = GetWindowHandle();
-        return Constants.S_OK;
-    }
+    public bool Enabled { get; set; } = true;
+    HRESULT IHelloWorldControl.get_Enabled(out BOOL value) { value = Enabled; return Constants.S_OK; }
+    HRESULT IHelloWorldControl.set_Enabled(BOOL value) { Enabled = value; return Constants.S_OK; }
 
-    [DispId(0x20000)] // example of explicit dispid
+    public HWND HWND => GetWindowHandle();
+    HRESULT IHelloWorldControl.get_HWND(out nint value) { value = HWND; return Constants.S_OK; }
+
+    // example of explicit dispid
+    // priority for dispids is:
+    // 1. look for explicit DispId in TypeLib/IDL
+    // 2. look for explicit DispId as a .NET attribute
+    // 3. assign dispids automatically starting from AutoDispidsBase (0x10000 by default)
+    [DispId(0x20000)]
     [ComAliasName("__id")] // example of alias name for IDispatch (Excel likes this attribute)
     public int Id { get; set; }
 

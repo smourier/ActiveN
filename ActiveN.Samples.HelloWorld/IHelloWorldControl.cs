@@ -4,19 +4,29 @@
 [GeneratedComInterface]
 public partial interface IHelloWorldControl : IDispatch
 {
+#pragma warning disable IDE1006 // Naming Styles
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
-    HRESULT CurrentDateTime(out double ret);
+    HRESULT get_Enabled(out BOOL value);
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
-    HRESULT HWND(out nint ret);
+    HRESULT set_Enabled(BOOL value);
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
-    HRESULT ComputePi(out double ret);
+    HRESULT get_HWND(out nint value);
+#pragma warning restore IDE1006 // Naming Styles
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
-    HRESULT Add(double left, double right, out double ret);
+    HRESULT get_CurrentDateTime(out double value);
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT ComputePi(out double value);
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT Add(double left, double right, out double value);
 }

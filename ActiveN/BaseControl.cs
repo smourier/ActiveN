@@ -67,45 +67,81 @@ public abstract partial class BaseControl : BaseDispatch,
 
         var oldState = State;
         State = newState;
-        switch (newState)
+
+        var inPlaceSite = _inPlaceSite;
+        if (inPlaceSite != null)
         {
-            case ControlState.InplaceActive:
-                _inPlaceSite?.Object.OnInPlaceActivate().ThrowOnError();
-                if (oldState == ControlState.UIActive)
-                {
-                    _inPlaceSite?.Object.OnUIDeactivate(false).ThrowOnError();
-                }
-                break;
+            HRESULT hr;
+            switch (newState)
+            {
+                case ControlState.InplaceActive:
+                    hr = inPlaceSite.Object.OnInPlaceActivate();
+                    if (hr.IsError)
+                    {
+                        TracingUtilities.Trace($"OnInPlaceActivate: {hr}");
+                    }
 
-            case ControlState.Active:
-                // nothing to do
-                break;
+                    if (oldState == ControlState.UIActive)
+                    {
+                        // VB fails with E_FAIL here, probably not a real problem
+                        hr = inPlaceSite.Object.OnUIDeactivate(false);
+                        if (hr.IsError)
+                        {
+                            TracingUtilities.Trace($"OnUIDeactivate: {hr}");
+                        }
+                    }
+                    break;
 
-            case ControlState.UIActive:
-                _inPlaceSite?.Object.OnUIActivate().ThrowOnError();
-                break;
+                case ControlState.Active:
+                    // nothing to do
+                    break;
 
-            case ControlState.Running:
-                if (oldState == ControlState.UIActive)
-                {
-                    _inPlaceSite?.Object.OnUIDeactivate(false).ThrowOnError();
-                    _inPlaceSite?.Object.OnInPlaceDeactivate().ThrowOnError();
-                }
-                else if (oldState == ControlState.InplaceActive)
-                {
-                    _inPlaceSite?.Object.OnInPlaceDeactivate().ThrowOnError();
-                }
-                break;
+                case ControlState.UIActive:
+                    hr = inPlaceSite.Object.OnUIActivate();
+                    if (hr.IsError)
+                    {
+                        TracingUtilities.Trace($"OnUIActivate: {hr}");
+                    }
+                    break;
+
+                case ControlState.Running:
+                    if (oldState == ControlState.UIActive)
+                    {
+                        hr = inPlaceSite.Object.OnUIDeactivate(false);
+                        if (hr.IsError)
+                        {
+
+                            TracingUtilities.Trace($"OnUIDeactivate: {hr}");
+                        }
+
+                        hr = inPlaceSite.Object.OnInPlaceDeactivate();
+                        if (hr.IsError)
+                        {
+                            TracingUtilities.Trace($"OnInPlaceDeactivate: {hr}");
+                        }
+                    }
+                    else if (oldState == ControlState.InplaceActive)
+                    {
+                        hr = inPlaceSite.Object.OnInPlaceDeactivate();
+                        if (hr.IsError)
+                        {
+                            TracingUtilities.Trace($"OnInPlaceDeactivate: {hr}");
+                        }
+                    }
+                    break;
+            }
         }
     }
 
+    protected virtual HRESULT DiscardUndoState(HWND hwndParent, RECT pos) => NotImplemented();
+
     protected virtual HRESULT UIActivate(HWND hwndParent, RECT pos)
     {
+        var window = EnsureWindow(hwndParent, pos);
+        TracingUtilities.Trace($"window: {window}");
         ChangeState(ControlState.UIActive);
         return Constants.S_OK;
     }
-
-    protected virtual HRESULT DiscardUndoState(HWND hwndParent, RECT pos) => NotImplemented();
 
     protected virtual HRESULT InplaceActivate(HWND hwndParent, RECT pos)
     {

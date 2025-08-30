@@ -121,10 +121,17 @@
 			<Output TaskParameter="SdkBinPath" ItemName="WindowsSDKBinPath" />
 			<Output TaskParameter="VsInstallPath" ItemName="VsInstallPath" />
 		</GetWindowsSDKPaths>
-		<MakeDir Directories="$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)tlb" />
+		<MakeDir Directories="$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)$(Platform)\tlb" />
 
-		<Exec Command="call &quot;@(VsInstallPath)\VC\Auxiliary\Build\vcvars64.bat&quot;&#xD;&#xA;&quot;@(WindowsSDKBinPath)\midl.exe&quot; /env x64 &quot;%(Midl.FullPath)&quot; /out &quot;$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)tlb&quot;" />
-		<Copy SourceFiles="$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)tlb\%(Midl.FileName).tlb" DestinationFolder="$(MSBuildProjectDirectory)\$(OutputPath)" />
+		<PropertyGroup>
+			<MidlEnv Condition="'$(Platform)' == 'x64'">x64</MidlEnv>
+			<MidlEnv Condition="'$(Platform)' == 'x86'">win32</MidlEnv>
+			<RcFileFlags Condition="'$(Configuration)' == 'Debug'">0x1L</RcFileFlags>
+			<RcFileFlags Condition="'$(Configuration)' != 'Debug'">0x0L</RcFileFlags>
+		</PropertyGroup>
+
+		<Exec Command="call &quot;@(VsInstallPath)\VC\Auxiliary\Build\vcvars64.bat&quot;&#xD;&#xA;&quot;@(WindowsSDKBinPath)\midl.exe&quot; /env $(MidlEnv) &quot;%(Midl.FullPath)&quot; /out &quot;$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)$(Platform)\tlb&quot;" />
+		<Copy SourceFiles="$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)$(Platform)\tlb\%(Midl.FileName).tlb" DestinationFolder="$(MSBuildProjectDirectory)\$(OutputPath)" />
 
 		<!-- build a .rc, rebuild version resource -->
 		<PropertyGroup>
@@ -134,7 +141,7 @@
 					FILEVERSION $([System.String]::new('$(FileVersion)').Replace('.',','))
 					PRODUCTVERSION $([System.String]::new('$(ProductVersion)').Replace('.',','))
 					FILEFLAGSMASK 0x3fL
-					FILEFLAGS 0x0L
+					FILEFLAGS $(RcFileFlags)
 					FILEOS 0x40004L
 					FILETYPE 0x2L
 					FILESUBTYPE 0x0L
@@ -165,14 +172,14 @@
 			</BitmapRc>
 			
 		</PropertyGroup>
-		<WriteLinesToFile File="$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)tlb\%(Midl.FileName).rc" Overwrite="true" Lines="$(TypeLibRc)" />
-		<WriteLinesToFile File="$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)tlb\%(Midl.FileName).rc" Condition="@(ToolBoxBitmap32) != ''" Lines="$(BitmapRc)" />
+		<WriteLinesToFile File="$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)$(Platform)\tlb\%(Midl.FileName).rc" Overwrite="true" Lines="$(TypeLibRc)" />
+		<WriteLinesToFile File="$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)$(Platform)\tlb\%(Midl.FileName).rc" Condition="@(ToolBoxBitmap32) != ''" Lines="$(BitmapRc)" />
 
 		<!-- compiles the .rc into a .res -->
-		<Exec Command="call &quot;@(WindowsSDKBinPath)\rc.exe&quot; &quot;$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)tlb\%(Midl.FileName).rc&quot;" />
+		<Exec Command="call &quot;@(WindowsSDKBinPath)\rc.exe&quot; &quot;$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)$(Platform)\tlb\%(Midl.FileName).rc&quot;" />
 
 		<PropertyGroup>
-			<Win32Resource>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)tlb\%(Midl.FileName).res</Win32Resource>
+			<Win32Resource>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)$(Platform)\tlb\%(Midl.FileName).res</Win32Resource>
 		</PropertyGroup>
 
 	</Target>

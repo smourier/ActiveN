@@ -57,12 +57,36 @@ public abstract partial class BaseDispatch : IDisposable
     //     Dispose(disposing: false);
     // }
 
+    private DispatchType GetDispatchType()
+    {
+        var type = GetType();
+        if (!_cache.TryGetValue(type, out var dispatchType))
+        {
+            // we can load dispids from type info if they are declared in idl (Standard dispatch ID constants in olectl.h, like DISPID_HWND, etc.)
+            // or build them using reflection
+            dispatchType = new DispatchType(type);
+
+            var ti = EnsureTypeInfo();
+            if (ti != null)
+            {
+                // add dispids for methods and properties declared in the IDL
+                dispatchType.AddTypeInfoDispids(ti.Object);
+            }
+
+            // add dispids for public methods and properties using reflection (not already added by type info).
+            // AutoDispidsBase is the base value.
+            dispatchType.AddAutoDispids(AutoDispidsBase);
+
+            _cache[type] = dispatchType;
+        }
+        return dispatchType;
+    }
+
     protected virtual HRESULT GetIDsOfNames(in Guid riid, PWSTR[] rgszNames, uint cNames, uint lcid, int[] rgDispId)
     {
         if (rgszNames == null || rgszNames.Length == 0 || rgszNames.Length != cNames)
             return Constants.E_INVALIDARG;
 
-        var type = GetType();
         for (var i = 0; i < cNames; i++)
         {
             var name = rgszNames[i].ToString();
@@ -73,27 +97,7 @@ public abstract partial class BaseDispatch : IDisposable
             }
 
             TracingUtilities.Trace($"name '{name}'");
-
-            if (!_cache.TryGetValue(type, out var dispatchType))
-            {
-                // we can load dispids from type info if they are declared in idl (Standard dispatch ID constants in olectl.h, like DISPID_HWND, etc.)
-                // or build them using reflection
-                dispatchType = new DispatchType(type);
-
-                var ti = EnsureTypeInfo();
-                if (ti != null)
-                {
-                    // add dispids for methods and properties declared in the IDL
-                    dispatchType.AddTypeInfoDispids(ti.Object);
-                }
-
-                // add dispids for public methods and properties using reflection (not already added by type info).
-                // AutoDispidsBase is the base value.
-                dispatchType.AddAutoDispids(AutoDispidsBase);
-
-                _cache[type] = dispatchType;
-            }
-
+            var dispatchType = GetDispatchType();
             if (dispatchType.TryGetDispId(name, out var dispId))
             {
                 rgDispId[i] = dispId;
@@ -116,9 +120,9 @@ public abstract partial class BaseDispatch : IDisposable
         try
         {
             TracingUtilities.Trace($"dispIdMember: {dispIdMember} (0x{dispIdMember:X8}) wFlags: {wFlags} cArgs: {pDispParams.cArgs} pVarResult: {pVarResult} pExcepInfo: {pExcepInfo} puArgErr: {puArgErr}");
-            var type = GetType();
+            var dispatchType = GetDispatchType();
             // note we can return DISP_E_MEMBERNOTFOUND for a method/property that exists in the TLB but not in the actual type
-            if (!_cache.TryGetValue(type, out var dispatchType) || dispatchType.GetMemberInfo(dispIdMember) is not MemberInfo member)
+            if (dispatchType.GetMemberInfo(dispIdMember) is not MemberInfo member)
             {
                 TracingUtilities.Trace($"dispIdMember: {dispIdMember} was not found => DISP_E_MEMBERNOTFOUND.");
                 return Constants.DISP_E_MEMBERNOTFOUND;
@@ -134,8 +138,7 @@ public abstract partial class BaseDispatch : IDisposable
                     if (pVarResult != 0)
                     {
                         using var v = new Variant(value);
-                        var detached = v.Detach();
-                        *(VARIANT*)pVarResult = detached;
+                        v.DetachTo(pVarResult);
                     }
                     return Constants.S_OK;
                 }
@@ -263,8 +266,7 @@ public abstract partial class BaseDispatch : IDisposable
                     if (pVarResult != 0)
                     {
                         using var v = new Variant(result, resultType);
-                        var detached = v.Detach();
-                        *(VARIANT*)pVarResult = detached;
+                        v.DetachTo(pVarResult);
                     }
                     return Constants.S_OK;
                 }

@@ -6,7 +6,6 @@ import "ocidl.idl";
 
 [
 	uuid(00000000-2126-40c8-a2f3-8fa83f8cc1f6),
-	control,
 	version(1.0),
 	helpstring("ActiveN.Samples.HelloWorld 1.0 Type Library")
 ]
@@ -24,14 +23,20 @@ library ActiveNSamplesHelloWorldLib
 	]
 	interface IHelloWorldControl : IDispatch
 	{
+		// these are standard properties for ActiveX controls (declared olectl.h)
+		[propput, bindable, requestedit, id(DISPID_ENABLED)]
+		HRESULT Enabled([in]VARIANT_BOOL vbool);
+
+		[propget, bindable, requestedit, id(DISPID_ENABLED)]
+			HRESULT Enabled([out, retval]VARIANT_BOOL* pbool);
+
+		[propget, bindable, requestedit, id(DISPID_HWND)]
+			HRESULT HWND([out, retval]LONG_PTR* pHWND);
+
 		// properties must match HelloWorldControl's public properties
 		// dispids are auto-generated here, unless specified
 		[propget, bindable, requestedit]
-		HRESULT CurrentDateTime([out, retval] double* ret);
-
-		// this is a standard property for ActiveX controls (declared olectl.h)
-		[propget, bindable, requestedit, id(DISPID_HWND)]
-		HRESULT HWND([out, retval]LONG_PTR* pHWND);
+			HRESULT CurrentDateTime([out, retval] double* ret);
 
 		// methods must match HelloWorldControl's public methods & IHelloWorldControl interface
 		HRESULT ComputePi([out, retval] double* ret);
