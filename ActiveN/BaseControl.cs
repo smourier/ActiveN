@@ -139,6 +139,9 @@ public abstract partial class BaseControl : BaseDispatch,
     {
         var window = EnsureWindow(hwndParent, pos);
         TracingUtilities.Trace($"window: {window}");
+        window?.Show();
+        ((IOleInPlaceObject)this).SetObjectRects(pos, pos);
+
         ChangeState(ControlState.UIActive);
         return Constants.S_OK;
     }
@@ -147,19 +150,15 @@ public abstract partial class BaseControl : BaseDispatch,
     {
         var window = EnsureWindow(hwndParent, pos);
         TracingUtilities.Trace($"window: {window}");
+        window?.Show();
+        ((IOleInPlaceObject)this).SetObjectRects(pos, pos);
 
-        if (_inPlaceSite != null)
-        {
-            TracingUtilities.Trace($"calling OnInPlaceActivate");
-            _inPlaceSite.Object.OnInPlaceActivate().ThrowOnError();
-
-            // in the case of hosted in VS, if .NET < 10, this fails if the control has no parent (Winforms Control)
-            //var info = new OLEINPLACEFRAMEINFO { cb = (uint)sizeof(OLEINPLACEFRAMEINFO) };
-            //_inPlaceSite.Object.GetWindowContext(out var frameObj, out var uiWindowObj, out var rcPos, out var clip, ref info).ThrowOnError();
-            //using var frame = frameObj != null ? new ComObject<IOleInPlaceFrame>(frameObj) : null;
-            //using var uiWindow = uiWindowObj != null ? new ComObject<IOleInPlaceUIWindow>(uiWindowObj) : null;
-            //TracingUtilities.Trace($"frameObj: {frame} uiWindo: {uiWindow} rcPos: {rcPos} clip: {clip} info hwnd: {info.hwndFrame}");
-        }
+        // in the case of hosted in VS, if .NET < 10, this fails if the control has no parent (Winforms Control)
+        //var info = new OLEINPLACEFRAMEINFO { cb = (uint)sizeof(OLEINPLACEFRAMEINFO) };
+        //_inPlaceSite.Object.GetWindowContext(out var frameObj, out var uiWindowObj, out var rcPos, out var clip, ref info).ThrowOnError();
+        //using var frame = frameObj != null ? new ComObject<IOleInPlaceFrame>(frameObj) : null;
+        //using var uiWindow = uiWindowObj != null ? new ComObject<IOleInPlaceUIWindow>(uiWindowObj) : null;
+        //TracingUtilities.Trace($"frameObj: {frame} uiWindo: {uiWindow} rcPos: {rcPos} clip: {clip} info hwnd: {info.hwndFrame}");
 
         //pActiveSite.ShowObject().ThrowOnError();
         ChangeState(ControlState.InplaceActive);
@@ -169,12 +168,14 @@ public abstract partial class BaseControl : BaseDispatch,
     protected virtual HRESULT Open(HWND hwndParent, RECT pos)
     {
         TracingUtilities.Trace($"hwndParent: {hwndParent} pos: {pos}");
+        _window?.Show();
         return InplaceActivate(hwndParent, pos);
     }
 
     protected virtual HRESULT Hide(HWND hwndParent, RECT pos)
     {
         TracingUtilities.Trace($"hwndParent: {hwndParent} pos: {pos}");
+        _window?.Hide();
         ChangeState(ControlState.Running);
         return Constants.S_OK;
     }
