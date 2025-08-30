@@ -1,7 +1,7 @@
 ﻿namespace ActiveN.Samples.HelloWorld;
 
 public class HelloWorldWindow(HWND parentHandle, WINDOW_STYLE style, RECT rect)
-    : Window(parentHandle: parentHandle, style: style, rect: rect)
+    : Window(title: nameof(HelloWorldWindow), parentHandle: parentHandle, style: style, rect: rect)
 {
     protected override bool OnPaint(HDC hdc, PAINTSTRUCT ps)
     {

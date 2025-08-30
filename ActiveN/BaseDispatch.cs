@@ -21,6 +21,7 @@ public abstract partial class BaseDispatch : IDisposable
         {
             var reg = ComRegistration ?? throw new InvalidOperationException("ComRegistration is not set");
             using var typeLib = TypeLib.LoadTypeLib(reg.DllPath, throwOnError: false);
+            TracingUtilities.Trace($"Loaded type lib for type : {GetType().GUID:B} from: {reg.DllPath} typeLib: {typeLib}");
             if (typeLib != null)
             {
                 var hr = typeLib.Object.GetTypeInfoOfGuid(GetType().GUID, out var ti);
@@ -146,6 +147,7 @@ public abstract partial class BaseDispatch : IDisposable
 
                     var varArgs = (VARIANT*)pDispParams.rgvarg;
                     var setValue = Variant.Unwrap(varArgs[0]);
+                    TracingUtilities.Trace($"set value: {setValue}");
                     property.SetValue(this, setValue);
                     return Constants.S_OK;
                 }
@@ -337,7 +339,7 @@ public abstract partial class BaseDispatch : IDisposable
     {
         private readonly Dictionary<string, DispatchMember> _membersByName = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<int, DispatchMember> _memberByDispIds = [];
-        private readonly HashSet<string> _restrictedNames = [];
+        private readonly HashSet<string> _restrictedNames = new(StringComparer.OrdinalIgnoreCase);
 
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)]
         public Type Type { get; } = type;
@@ -372,18 +374,16 @@ public abstract partial class BaseDispatch : IDisposable
 
                     // skip restricted (QueryInterface, AddRef, Invoke, etc.)
                     var name = TypeLib.GetName(refTypeInfo.Object, funcDesc.Value.memid);
-                    if (funcDesc.Value.wFuncFlags.HasFlag(FUNCFLAGS.FUNCFLAG_FRESTRICTED))
-                    {
-                        if (name != null)
-                        {
-                            _restrictedNames.Add(name);
-                        }
-                        continue;
-                    }
-
                     TracingUtilities.Trace($"funcDesc: id: {funcDesc.Value.memid} name:'{name}' kind: {funcDesc.Value.funckind} invkind: {funcDesc.Value.invkind} params: {funcDesc.Value.cParams} paramsOpt: {funcDesc.Value.cParamsOpt} flags: {funcDesc.Value.wFuncFlags}");
                     if (name == null)
                         continue;
+
+                    if (funcDesc.Value.wFuncFlags.HasFlag(FUNCFLAGS.FUNCFLAG_FRESTRICTED))
+                    {
+                        TracingUtilities.Trace($"restricted: {name}");
+                        _restrictedNames.Add(name);
+                        continue;
+                    }
 
                     // if null, means the method/property is in the TLB but not in the actual type
                     var memberInfo = (MemberInfo?)Type.GetProperty(name, BindingFlags.Public | BindingFlags.Instance)
@@ -410,8 +410,12 @@ public abstract partial class BaseDispatch : IDisposable
                 if (_membersByName.ContainsKey(method.Name))
                     continue;
 
-                var member = new DispatchMember(autoDispidsBase + _membersByName.Count, method);
-                _membersByName[method.Name] = member;
+                // allow developer to customize name & dispid using attributes
+                var name = method.GetCustomAttribute<ComAliasNameAttribute>()?.Value ?? method.Name;
+                var dispid = method.GetCustomAttribute<DispIdAttribute>()?.Value ?? autoDispidsBase + _membersByName.Count;
+
+                var member = new DispatchMember(dispid, method);
+                _membersByName[name] = member;
                 _memberByDispIds[member.DispId] = member;
             }
 
@@ -425,12 +429,21 @@ public abstract partial class BaseDispatch : IDisposable
                 if (_membersByName.ContainsKey(property.Name))
                     continue;
 
-                var member = new DispatchMember(autoDispidsBase + _membersByName.Count, property);
-                _membersByName[property.Name] = member;
+                // allow developer to customize name & dispid using attributes
+                var name = property.GetCustomAttribute<ComAliasNameAttribute>()?.Value ?? property.Name;
+                var dispid = property.GetCustomAttribute<DispIdAttribute>()?.Value ?? autoDispidsBase + _membersByName.Count;
+
+                var member = new DispatchMember(dispid, property);
+                _membersByName[name] = member;
                 _memberByDispIds[member.DispId] = member;
             }
 
 #if DEBUG
+            foreach (var name in _restrictedNames)
+            {
+                TracingUtilities.Trace($"restricted: {name}");
+            }
+
             foreach (var kv in _memberByDispIds)
             {
                 TracingUtilities.Trace($"dispid: {kv.Key} => {kv.Value}");

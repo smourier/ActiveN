@@ -37,6 +37,10 @@ public partial class HelloWorldControl : BaseControl, IHelloWorldControl
         return Constants.S_OK;
     }
 
+    [DispId(0x20000)] // example of explicit dispid
+    [ComAliasName("__id")] // example of alias name for IDispatch (Excel likes this attribute)
+    public int Id { get; set; }
+
     // this is not in the IDL, but it works (IDispatch + automatic dispid)
     public long TickCount => Environment.TickCount64;
 

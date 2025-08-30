@@ -400,8 +400,9 @@ public abstract partial class BaseControl : BaseDispatch,
         var userType = PWSTR.Null;
         var hr = TracingUtilities.WrapErrors(() =>
         {
-            var hr = Functions.OleRegGetUserType(GetType().GUID, dwFormOfType, out var userType);
-            TracingUtilities.Trace($"dwFormOfType: {dwFormOfType} pszUserType: '{userType}' hr: {hr}");
+            var form = (USERCLASSTYPE)dwFormOfType;
+            var hr = Functions.OleRegGetUserType(GetType().GUID, dwFormOfType, out userType);
+            TracingUtilities.Trace($"dwFormOfType: {form} pszUserType: '{userType}' hr: {hr}");
             return hr;
         });
         pszUserType = userType;
@@ -492,7 +493,7 @@ public abstract partial class BaseControl : BaseDispatch,
         var hr = TracingUtilities.WrapErrors(() =>
         {
             var ti = EnsureTypeInfo();
-            TracingUtilities.Trace($"ppTI {ti}");
+            TracingUtilities.Trace($"ppTI: {ti}");
             pti = ti?.Object;
             return pti != null ? Constants.S_OK : Constants.E_UNEXPECTED;
         });
@@ -676,7 +677,8 @@ public abstract partial class BaseControl : BaseDispatch,
 
     HRESULT IOleControl.OnAmbientPropertyChange(int dispID) => TracingUtilities.WrapErrors(() =>
     {
-        TracingUtilities.Trace($"dispID: {dispID}");
+        var dispid = (DISPID)dispID;
+        TracingUtilities.Trace($"dispID: {dispid}");
         return Constants.S_OK;
     });
 

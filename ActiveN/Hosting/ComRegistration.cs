@@ -357,12 +357,13 @@ public abstract partial class ComRegistration
         if (!Functions.GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, new PWSTR((nint)ptr), out var module))
             throw new Win32Exception(Marshal.GetLastPInvokeError());
 
-        var size = 256;
+        var size = 256; // 128 wchars
         do
         {
             using var pwstr = new AllocPwstr(size);
-            Functions.GetModuleFileNameW(module, pwstr, pwstr.SizeInChars); // just to ensure the DLL is loaded
-            if (Marshal.GetLastWin32Error() != (int)WIN32_ERROR.ERROR_INSUFFICIENT_BUFFER)
+            var msize = Functions.GetModuleFileNameW(module, pwstr, pwstr.SizeInChars);
+            // note we could check for ERROR_INSUFFICIENT_BUFFER but it's not always set for some reason (for example, under Excel, very weird)
+            if (msize != 0 && msize < pwstr.SizeInChars) // if msize == insize, it means the buffer was too small
                 return pwstr.ToString()!;
 
             size *= 2;
