@@ -15,6 +15,34 @@ public partial interface IPdfViewControl : IDispatch
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT get_Caption(out BSTR value);
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT set_Caption(BSTR value);
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT get_ShowControls(out BOOL value);
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT set_ShowControls(BOOL value);
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
     HRESULT get_HWND(out nint value);
 #pragma warning restore IDE1006 // Naming Styles
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT OpenFile(BSTR filePath);
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT CloseFile();
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT MovePage(int delta);
 }

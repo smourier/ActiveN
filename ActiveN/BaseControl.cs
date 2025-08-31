@@ -21,6 +21,7 @@ public abstract partial class BaseControl : BaseDispatch,
     ISupportErrorInfo,
     IConnectionPointContainer,
     ISpecifyPropertyPages,
+    IRunnableObject,
     ICustomQueryInterface
 {
     private readonly ConcurrentDictionary<Guid, IConnectionPoint> _connectionPoints = new();
@@ -58,6 +59,11 @@ public abstract partial class BaseControl : BaseDispatch,
     protected virtual Window? Window => _window;
     protected override HWND GetWindowHandle() => _window?.Handle ?? HWND.Null;
     protected virtual ControlState State { get; private set; }
+
+    protected virtual void SetWindowPos(RECT position)
+    {
+        _window?.SetWindowPos(HWND.Null, position.left, position.top, position.Width, position.Height, SET_WINDOW_POS_FLAGS.SWP_NOZORDER | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE);
+    }
 
     protected virtual void ChangeState(ControlState newState)
     {
@@ -226,21 +232,6 @@ public abstract partial class BaseControl : BaseDispatch,
     protected virtual CustomQueryInterfaceResult GetInterface(ref Guid iid, out nint ppv)
     {
         ppv = 0;
-        //// don't log these
-        //if (iid == typeof(IOleLink).GUID || iid == typeof(IPersistStorage).GUID)
-        //    return CustomQueryInterfaceResult.NotHandled;
-
-        //// keep an eye on these
-        //if (iid == typeof(IRunnableObject).GUID)
-        //{
-        //    TracingUtilities.Trace(typeof(IRunnableObject).Name);
-        //}
-        //else if (iid != typeof(IOleObject).GUID && iid != typeof(IProvideClassInfo).GUID && iid != typeof(IOleObject).GUID &&
-        //    iid != typeof(IPersistStreamInit).GUID && iid != typeof(IViewObject2).GUID && iid != typeof(IViewObjectEx).GUID &&
-        //    iid != typeof(IOleControl).GUID && iid != typeof(IPointerInactive).GUID)
-        //{
-        //    TracingUtilities.Trace($"GetInterface: {GuidNames.GetInterfaceIdName(iid)}");
-        //}
         TracingUtilities.Trace($"iid: {iid.GetName()}");
         return CustomQueryInterfaceResult.NotHandled;
     }
@@ -882,7 +873,7 @@ public abstract partial class BaseControl : BaseDispatch,
                 }
 
                 _ = Functions.SetWindowRgn(_window.Handle, tempRgn, true);
-                _window.SetWindowPos(HWND.Null, pos.left, pos.top, pos.Width, pos.Height, SET_WINDOW_POS_FLAGS.SWP_NOZORDER | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE);
+                SetWindowPos(pos);
             }
             return Constants.S_OK;
         });
@@ -1028,5 +1019,36 @@ public abstract partial class BaseControl : BaseDispatch,
             return Constants.S_OK;
         });
         return hr;
+    }
+
+    HRESULT IRunnableObject.GetRunningClass(out Guid lpClsid)
+    {
+        TracingUtilities.Trace();
+        lpClsid = GetType().GUID;
+        return Constants.S_OK;
+    }
+
+    HRESULT IRunnableObject.Run(IBindCtx pbc)
+    {
+        TracingUtilities.Trace($"pbc: {pbc}");
+        return Constants.S_OK;
+    }
+
+    BOOL IRunnableObject.IsRunning()
+    {
+        TracingUtilities.Trace();
+        return true;
+    }
+
+    HRESULT IRunnableObject.LockRunning(BOOL fLock, BOOL fLastUnlockCloses)
+    {
+        TracingUtilities.Trace($"fLock: {fLock} fLastUnlockCloses: {fLastUnlockCloses}");
+        return Constants.S_OK;
+    }
+
+    HRESULT IRunnableObject.SetContainedObject(BOOL fContained)
+    {
+        TracingUtilities.Trace($"fContained: {fContained}");
+        return Constants.S_OK;
     }
 }

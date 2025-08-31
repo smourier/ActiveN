@@ -41,6 +41,10 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.2.0" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<Reference Include="DirectN">
 			<HintPath>..\ActiveN\External\DirectN.dll</HintPath>
 		</Reference>
@@ -72,13 +76,24 @@
 		<Using Include="System.Diagnostics.CodeAnalysis" />
 		<Using Include="System.IO" />
 		<Using Include="System.Linq" />
+		<Using Include="System.Numerics" />
 		<Using Include="System.Reflection" />
 		<Using Include="System.Runtime.CompilerServices" />
 		<Using Include="System.Runtime.InteropServices" />
 		<Using Include="System.Runtime.InteropServices.Marshalling" />
 		<Using Include="System.Runtime.Versioning" />
 		<Using Include="System.Security" />
+		<Using Include="System.Threading" />
 		<Using Include="System.Threading.Tasks" />
+		<Using Include="Windows.Data.Pdf" />
+		<Using Include="Windows.Graphics.DirectX" />
+		<Using Include="Windows.Foundation" />
+		<Using Include="Windows.Storage.Pickers" />
+		<Using Include="Windows.UI" />
+		<Using Include="Windows.UI.Composition" />
+		<Using Include="Windows.UI.Composition.Core" />
+		<Using Include="WinRT" />
+		<Using Include="WinRT.Interop" />
 	</ItemGroup>
 
 	<ItemGroup>

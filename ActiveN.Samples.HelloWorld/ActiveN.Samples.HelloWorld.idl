@@ -26,9 +26,13 @@ library ActiveNSamplesHelloWorldLib
 		// these are standard properties for ActiveX controls (declared olectl.h)
 		[propput, bindable, requestedit, id(DISPID_ENABLED)]
 		HRESULT Enabled([in]VARIANT_BOOL vbool);
-
 		[propget, bindable, requestedit, id(DISPID_ENABLED)]
 			HRESULT Enabled([out, retval]VARIANT_BOOL* pbool);
+
+		[propput, bindable, requestedit, id(DISPID_CAPTION)]
+			HRESULT Caption([in]BSTR strCaption);
+		[propget, bindable, requestedit, id(DISPID_CAPTION)]
+			HRESULT Caption([out, retval]BSTR* pstrCaption);
 
 		[propget, bindable, requestedit, id(DISPID_HWND)]
 			HRESULT HWND([out, retval]LONG_PTR* pHWND);

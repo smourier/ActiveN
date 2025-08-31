@@ -6,8 +6,12 @@ public partial class DispatchConnectionPoint(Guid sourceInterfaceId) : BaseConne
     protected override IComObject GetFromPointer(nint ptr) => DirectN.Extensions.Com.ComObject.FromPointer<IDispatch>(ptr) ?? throw new InvalidOperationException();
     public override Guid InterfaceId { get; } = sourceInterfaceId;
 
-    public virtual unsafe void InvokeMember(int dispId, params object?[]? parameters)
+    public virtual unsafe void InvokeMember(int dispId, params object?[]? parameters) => TracingUtilities.WrapErrors(() =>
     {
+        TracingUtilities.Trace($"dispid {dispId} with {parameters?.Length ?? 0} parameters. Sinks: {Sinks.Count}");
+        if (Sinks.Count == 0)
+            return;
+
         Variant[]? variants = null;
         VARIANT[]? vars;
         var dp = new DISPPARAMS();
@@ -37,6 +41,6 @@ public partial class DispatchConnectionPoint(Guid sourceInterfaceId) : BaseConne
         {
             variants.Dispose();
         }
-    }
+    });
 }
 

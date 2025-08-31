@@ -22,15 +22,57 @@ library ActiveNSamplesPdfViewLib
 	]
 	interface IPdfViewControl : IDispatch
 	{
-		// these are standard properties for ActiveX controls (declared olectl.h)
+		// these are standard properties for ActiveX controls (declared in olectl.h)
 		[propput, bindable, requestedit, id(DISPID_ENABLED)]
-		HRESULT Enabled([in]VARIANT_BOOL vbool);
-
+		HRESULT Enabled([in]VARIANT_BOOL value);
 		[propget, bindable, requestedit, id(DISPID_ENABLED)]
-			HRESULT Enabled([out, retval]VARIANT_BOOL* pbool);
+			HRESULT Enabled([out, retval]VARIANT_BOOL* value);
+
+		[propput, bindable, requestedit, id(DISPID_CAPTION)]
+			HRESULT Caption([in]BSTR value);
+		[propget, bindable, requestedit, id(DISPID_CAPTION)]
+			HRESULT Caption([out, retval]BSTR* value);
+
+		// these are custom properties for our PdfViewControl
+		[propput, bindable, requestedit]
+			HRESULT ShowControls([in]VARIANT_BOOL value);
+		[propget, bindable, requestedit]
+			HRESULT ShowControls([out, retval]VARIANT_BOOL* value);
+
+		[propget, bindable, requestedit]
+			HRESULT PageCount([out, retval]long* value);
+
+		[propget, bindable, requestedit]
+			HRESULT IsPasswordProtected([out, retval]VARIANT_BOOL* value);
+
+		[propget, bindable, requestedit]
+			HRESULT FilePath([out, retval]BSTR* value);
 
 		[propget, bindable, requestedit, id(DISPID_HWND)]
-			HRESULT HWND([out, retval]LONG_PTR* pHWND);
+			HRESULT HWND([out, retval]LONG_PTR* value);
+
+		HRESULT OpenFile(BSTR filePath);
+		HRESULT CloseFile();
+		HRESULT MovePage(long delta);
+	};
+
+	[
+		uuid(48c606f1-d597-467d-8a38-1c02fd7e019d),
+		helpstring("Event interface for IPdfViewControl")
+	]
+		dispinterface IPdfViewControlEvents
+	{
+		properties:
+		methods:
+			// ids here *must* match those in PdfViewControlEventsDispIds.cs
+			[id(100), helpstring("A new file was opened.")]
+			void FileOpened();
+
+			[id(101), helpstring("A file was closed.")]
+			void FileClosed();
+
+			[id(102), helpstring("Current page has changed.")]
+			void PageChanged();
 	};
 
 	[
@@ -40,5 +82,6 @@ library ActiveNSamplesPdfViewLib
 		coclass PdfViewControl
 	{
 		[default] interface IPdfViewControl;
+		[default, source] dispinterface IPdfViewControlEvents;
 	}
 }

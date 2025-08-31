@@ -443,17 +443,17 @@ public abstract partial class BaseDispatch : IDisposable
 #if DEBUG
             foreach (var name in _restrictedNames)
             {
-                TracingUtilities.Trace($"restricted: {name}");
+                TracingUtilities.Trace($"type: {Type.Name} restricted: {name}");
             }
 
             foreach (var kv in _memberByDispIds)
             {
-                TracingUtilities.Trace($"dispid: {kv.Key} => {kv.Value}");
+                TracingUtilities.Trace($"type: {Type.Name} dispid: {kv.Key} => {kv.Value}");
             }
 
             foreach (var kv in _membersByName)
             {
-                TracingUtilities.Trace($"name: '{kv.Key}' => {kv.Value}");
+                TracingUtilities.Trace($"type: {Type.Name} name: '{kv.Key}' => {kv.Value}");
             }
 #endif
         }

@@ -36,6 +36,10 @@ public partial class HelloWorldControl : BaseControl, IHelloWorldControl
     HRESULT IHelloWorldControl.get_Enabled(out BOOL value) { value = Enabled; return Constants.S_OK; }
     HRESULT IHelloWorldControl.set_Enabled(BOOL value) { Enabled = value; return Constants.S_OK; }
 
+    public string Caption { get; set; } = "Hello World";
+    HRESULT IHelloWorldControl.get_Caption(out BSTR value) { value = new BSTR(Marshal.StringToBSTR(Caption)); return Constants.S_OK; }
+    HRESULT IHelloWorldControl.set_Caption(BSTR value) { Caption = value.ToString() ?? string.Empty; return Constants.S_OK; }
+
     public HWND HWND => GetWindowHandle();
     HRESULT IHelloWorldControl.get_HWND(out nint value) { value = HWND; return Constants.S_OK; }
 
