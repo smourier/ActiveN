@@ -5,29 +5,52 @@ public static class TracingUtilities
     // write all traces on a single thread to avoid garbling the output
     private static int _threadId;
     private static TextWriter? _traceWriter;
-    private static readonly SingleThreadTaskScheduler _writerScheduler = new(thread =>
-    {
-        _threadId = thread.ManagedThreadId;
-        thread.Name = "ActiveN Trace Writer";
+    private static SingleThreadTaskScheduler? _writerScheduler;
 
-        var process = Process.GetCurrentProcess();
-        var dir = Path.Combine(Path.GetTempPath(), "ActiveN", process.ProcessName);
-        if (!Directory.Exists(dir))
+    public static bool TraceToFile
+    {
+        get => _traceWriter != null;
+        set
         {
-            try
+            if (value && _traceWriter == null)
             {
-                Directory.CreateDirectory(dir);
+                _writerScheduler = new(thread =>
+                {
+                    _threadId = thread.ManagedThreadId;
+                    thread.Name = "ActiveN Trace Writer";
+
+                    var dir = Path.Combine(Path.GetTempPath(), "ActiveN", SystemUtilities.CurrentProcess.ProcessName);
+                    if (!Directory.Exists(dir))
+                    {
+                        try
+                        {
+                            Directory.CreateDirectory(dir);
+                        }
+                        catch
+                        {
+                            // ignore
+                        }
+                    }
+
+                    Directory.SetCurrentDirectory(dir);
+                    _traceWriter = new StreamWriter(Path.Combine(dir, $"{Guid.NewGuid():N}.ActiveN.log")) { AutoFlush = true };
+                    _traceWriter?.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}][{_threadId}]Log starting, process: {SystemUtilities.CurrentProcess.MainModule?.FileName ?? SystemUtilities.CurrentProcess.ProcessName} lowbox: {SystemUtilities.IsAppContainer()}");
+                    return true;
+                });
             }
-            catch
+            else if (!value && _traceWriter != null)
             {
-                // ignore
+                var tw = Interlocked.Exchange(ref _traceWriter, null);
+                if (tw != null)
+                {
+                    tw.Flush();
+                    tw.Dispose();
+                }
+
+                Interlocked.Exchange(ref _writerScheduler, null)?.Dispose();
             }
         }
-        Directory.SetCurrentDirectory(dir);
-        _traceWriter = new StreamWriter(Path.Combine(dir, $"{Guid.NewGuid():N}.ActiveN.log")) { AutoFlush = true };
-        _traceWriter?.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}][{_threadId}]Log starting, process: {process.ProcessName} ({process.Id})");
-        return true;
-    });
+    }
 
     private static void TraceToWriter(string? text = null, string? methodName = null, string? filePath = null)
     {
@@ -37,7 +60,11 @@ public static class TracingUtilities
             return;
         }
 
-        _ = Task.Factory.StartNew(trace, CancellationToken.None, TaskCreationOptions.None, _writerScheduler);
+        var scheduler = _writerScheduler;
+        if (scheduler != null)
+        {
+            _ = Task.Factory.StartNew(trace, CancellationToken.None, TaskCreationOptions.None, scheduler);
+        }
 
         void trace()
         {
@@ -45,10 +72,11 @@ public static class TracingUtilities
         }
     }
 
-    public static void FlushTextWriter()
+    public static void Flush()
     {
         // don't use scheduler thread for this
         _traceWriter?.Flush();
+        _writerScheduler?.TriggerDequeue();
     }
 
     public static void Trace(string? text = null, [CallerMemberName] string? methodName = null, [CallerFilePath] string? filePath = null)
@@ -58,7 +86,7 @@ public static class TracingUtilities
         EventProvider.Default.WriteMessageEvent($"[{Environment.CurrentManagedThreadId}]{name}:: {methodName}: {text}");
     }
 
-    public static T? WrapErrors<T>(this Func<T> action, Action? actionOnError = null)
+    public static T? WrapErrors<T>(this Func<T> action, Action? actionOnError = null, [CallerMemberName] string? methodName = null, [CallerFilePath] string? filePath = null)
     {
         ArgumentNullException.ThrowIfNull(action);
         try
@@ -68,7 +96,8 @@ public static class TracingUtilities
         catch (SecurityException se)
         {
             // transform this one as a well-known access denied
-            Trace($"Ex: {se}");
+            Trace($"Security Error: {se}", methodName, filePath);
+            SetError(se.GetInterestingExceptionMessage(), methodName, filePath);
             if (actionOnError != null)
             {
                 try
@@ -77,7 +106,7 @@ public static class TracingUtilities
                 }
                 catch (Exception ex2)
                 {
-                    Trace($"Ex2: {ex2}");
+                    Trace($"Security Error2: {ex2}", methodName, filePath);
                     // continue;
                 }
             }
@@ -94,7 +123,8 @@ public static class TracingUtilities
         }
         catch (Exception ex)
         {
-            Trace($"Ex: {ex}");
+            Trace($"Error: {ex}", methodName, filePath);
+            SetError(ex.GetInterestingExceptionMessage(), methodName, filePath);
             if (actionOnError != null)
             {
                 try
@@ -103,10 +133,11 @@ public static class TracingUtilities
                 }
                 catch (Exception ex2)
                 {
-                    Trace($"Ex2: {ex2}");
+                    Trace($"Error2: {ex2}", methodName, filePath);
                     // continue;
                 }
             }
+
             if (typeof(T) == typeof(uint))
                 return (T)(object)(uint)ex.HResult;
 
@@ -120,48 +151,24 @@ public static class TracingUtilities
         }
     }
 
-    public static uint WrapErrors(Action action, Action? actionOnError = null)
+    private static string? GetSource(string? methodName, string? filePath)
     {
-        ArgumentNullException.ThrowIfNull(action);
-        try
-        {
-            action();
-            return 0;
-        }
-        catch (SecurityException se)
-        {
-            // transform this one as a well-known access denied
-            Trace($"Ex: {se}");
-            if (actionOnError != null)
-            {
-                try
-                {
-                    actionOnError();
-                }
-                catch (Exception ex2)
-                {
-                    Trace($"Ex2: {ex2}");
-                    // continue;
-                }
-            }
-            return (uint)Constants.E_ACCESSDENIED;
-        }
-        catch (Exception ex)
-        {
-            Trace($"Ex: {ex}");
-            if (actionOnError != null)
-            {
-                try
-                {
-                    actionOnError();
-                }
-                catch (Exception ex2)
-                {
-                    Trace($"Ex2: {ex2}");
-                    // continue;
-                }
-            }
-            return (uint)ex.HResult;
-        }
+        var source = methodName.Nullify();
+        filePath = filePath.Nullify();
+        if (source == null)
+            return filePath;
+
+        if (filePath == null)
+            return source;
+
+        return $"{filePath}:{source}";
+    }
+
+    public static void SetError(string? description, [CallerMemberName] string? methodName = null, [CallerFilePath] string? filePath = null)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+            return;
+
+        ComError.SetError(description, GetSource(methodName, filePath));
     }
 }

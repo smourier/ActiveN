@@ -9,7 +9,8 @@
 [GeneratedComClass]
 public partial class PdfViewControl : BaseControl, IPdfViewControl
 {
-    private readonly DispatchConnectionPoint _eventsConnectionPoint;
+    private readonly DispatchConnectionPoint _eventsConnectionPoint; // disposed by BaseControl
+    private WindowsDispatcherQueueController? _dispatcherQueueController;
 
     public PdfViewControl()
         : base()
@@ -17,8 +18,8 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
         // we need that to be able to use Windows.UI.Composition APIs
         // and no, we can't use Windows.System.DispatcherQueueController.CreateOnDedicatedThread()
         // even implicitly, or compositor will raise an access denied error
-        DispatcherQueueController = new WindowsDispatcherQueueController();
-        DispatcherQueueController.EnsureOnCurrentThread();
+        _dispatcherQueueController = new WindowsDispatcherQueueController();
+        _dispatcherQueueController.EnsureOnCurrentThread();
 
         // setup connection point for our (IDispatch) events
         // the advantage of IDispatch-based events is that we don't need to define interfaces or classes, 
@@ -28,8 +29,13 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
         AddConnectionPoint(_eventsConnectionPoint);
     }
 
-    public WindowsDispatcherQueueController DispatcherQueueController { get; }
-    public new PdfViewWindow? Window => (PdfViewWindow?)base.Window;
+    public new PdfViewWindow? Window => (PdfViewWindow?)base.Window; // disposed by BaseControl
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        Interlocked.Exchange(ref _dispatcherQueueController, null)?.Dispose();
+    }
 
     #region Mandatory overrides
     protected override ComRegistration ComRegistration => ComHosting.Instance;
@@ -60,6 +66,7 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
 #pragma warning disable CA1822 // Mark members as static; no since we're dealing with COM instance methods & properties
 
     // COM visible public properties exposed through IPdfView IDL should go here
+    // types of properties here must convertible into variants or must implement from IValueGet
     public bool Enabled { get; set; } = true;
     HRESULT IPdfViewControl.get_Enabled(out BOOL value) { value = Enabled; return Constants.S_OK; }
     HRESULT IPdfViewControl.set_Enabled(BOOL value) { Enabled = value; return Constants.S_OK; }
@@ -71,6 +78,10 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
     public bool ShowControls { get => Window?.ShowControls ?? true; set { if (Window != null) Window.ShowControls = value; } }
     HRESULT IPdfViewControl.get_ShowControls(out BOOL value) { value = ShowControls; return Constants.S_OK; }
     HRESULT IPdfViewControl.set_ShowControls(BOOL value) { ShowControls = value; return Constants.S_OK; }
+
+    public D3DCOLORVALUE BackColor { get => Window?.BackgroundColor ?? D3DCOLORVALUE.White; set { if (Window != null) Window.BackgroundColor = value; } }
+    HRESULT IPdfViewControl.get_BackColor(out uint value) { value = BackColor.UInt32Value; return Constants.S_OK; }
+    HRESULT IPdfViewControl.set_BackColor(uint value) { BackColor = new D3DCOLORVALUE(value); return Constants.S_OK; }
 
     public HWND HWND => GetWindowHandle();
     HRESULT IPdfViewControl.get_HWND(out nint value) { value = HWND; return Constants.S_OK; }
@@ -94,15 +105,6 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
 
     public void MovePage(int delta) => Window?.MovePage(delta);
     HRESULT IPdfViewControl.MovePage(int delta) { MovePage(delta); return Constants.S_OK; }
-
-    // example of explicit dispid
-    // priority for dispids is:
-    // 1. look for explicit DispId in TypeLib/IDL
-    // 2. look for explicit DispId as a .NET attribute
-    // 3. assign dispids automatically starting from AutoDispidsBase (0x10000 by default)
-    [DispId(0x20000)]
-    [ComAliasName("__id")] // example of alias name for IDispatch (Excel likes this attribute)
-    public int Id { get; set; }
 
 #pragma warning restore CA1822 // Mark members as static
     #endregion

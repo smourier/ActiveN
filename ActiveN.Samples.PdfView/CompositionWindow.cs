@@ -23,8 +23,8 @@ public class CompositionWindow : D3D11SwapChainWindow
         CompositorController = new CompositorController();
         CompositorController.CommitNeeded += (s, e) => s.Commit();
 
-        var desktopInterop = CompositorController.Compositor.As<ICompositorDesktopInterop>();
-        desktopInterop.CreateDesktopWindowTarget(Handle, TopMostDesktopWindowTarget, out var target).ThrowOnError();
+        var desktopInterop = CompositorController.Compositor.AsComObject<ICompositorDesktopInterop>();
+        desktopInterop.Object.CreateDesktopWindowTarget(Handle, TopMostDesktopWindowTarget, out var target).ThrowOnError();
         var compositionTarget = MarshalInspectable<CompositionTarget>.FromAbi(target);
 
         RootVisual = CreateWindowVisual();
@@ -63,10 +63,10 @@ public class CompositionWindow : D3D11SwapChainWindow
         if (device == null)
             return;
 
-        var interop = CompositorController.Compositor.As<ICompositorInterop>();
+        var interop = CompositorController.Compositor.AsComObject<ICompositorInterop>();
         DirectN.Extensions.Com.ComObject.WithComInstance(D2D1Device, unk =>
         {
-            interop.CreateGraphicsDevice(unk, out var obj).ThrowOnError();
+            interop.Object.CreateGraphicsDevice(unk, out var obj).ThrowOnError();
             GraphicsDevice = MarshalInterface<CompositionGraphicsDevice>.FromAbi(obj);
         });
     }

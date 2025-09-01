@@ -23,6 +23,14 @@ public partial interface IPdfViewControl : IDispatch
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT get_BackColor(out uint value);
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT set_BackColor(uint value);
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
     HRESULT get_ShowControls(out BOOL value);
 
     [PreserveSig]

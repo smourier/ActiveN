@@ -1,7 +1,7 @@
 ﻿namespace ActiveN;
 
 [GeneratedComClass]
-public partial class PropertyNotifySinkConnectionPoint : BaseConnectionPoint, IDisposable
+public partial class PropertyNotifySinkConnectionPoint : BaseConnectionPoint
 {
     protected override IComObject GetFromPointer(nint ptr) => DirectN.Extensions.Com.ComObject.FromPointer<IPropertyNotifySink>(ptr) ?? throw new InvalidOperationException();
     public override Guid InterfaceId => typeof(IPropertyNotifySink).GUID;
@@ -14,6 +14,7 @@ public partial class PropertyNotifySinkConnectionPoint : BaseConnectionPoint, ID
             var sink = kv.Value.As<IPropertyNotifySink>();
             sink?.Object.OnChanged(dispId);
         }
+        return Constants.S_OK;
     });
 
     public virtual void OnRequestEdit(int dispId) => TracingUtilities.WrapErrors(() =>
@@ -24,6 +25,7 @@ public partial class PropertyNotifySinkConnectionPoint : BaseConnectionPoint, ID
             var sink = kv.Value.As<IPropertyNotifySink>();
             sink?.Object.OnRequestEdit(dispId);
         }
+        return Constants.S_OK;
     });
 }
 

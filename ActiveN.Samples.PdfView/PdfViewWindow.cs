@@ -1,9 +1,12 @@
-﻿using Windows.Storage;
-
-namespace ActiveN.Samples.PdfView;
+﻿namespace ActiveN.Samples.PdfView;
 
 public class PdfViewWindow : Window
 {
+    private const int _buttonsHeight = 24;
+    private const int _buttonsPadding = 10;
+    private const int _buttonsWidth = 100;
+    private const string _title = "ActiveN Pdf View";
+
     private Font? _font;
     private PdfWindow? _pdfWindow;
     private PdfDocument? _pdfDocument;
@@ -11,10 +14,7 @@ public class PdfViewWindow : Window
     private HWND _previousButton;
     private HWND _nextButton;
     private bool _showControls = true;
-    private const int _buttonsHeight = 24;
-    private const int _buttonsPadding = 10;
-    private const int _buttonsWidth = 100;
-    private const string _title = "ActiveN Pdf View";
+    private D3DCOLORVALUE _backgroundColor = D3DCOLORVALUE.White;
 
     public event EventHandler? FileOpened;
     public event EventHandler? FileClosed;
@@ -56,6 +56,20 @@ public class PdfViewWindow : Window
                 return;
 
             _showControls = value;
+            RunTaskOnUIThread(UpdatePdfWindowSize, true);
+        }
+    }
+
+    public virtual D3DCOLORVALUE BackgroundColor
+    {
+        get => _backgroundColor;
+        set
+        {
+            if (_backgroundColor.Equals(value))
+                return;
+
+            _backgroundColor = value;
+            _pdfWindow?.Invalidate();
         }
     }
 
@@ -190,8 +204,18 @@ public class PdfViewWindow : Window
         var win = _pdfWindow;
         if (win != null)
         {
-            var rc = ClientRect;
-            var offset = _buttonsHeight + 2 * _buttonsPadding;
+            RECT rc;
+            int offset;
+            if (ShowControls)
+            {
+                rc = ClientRect;
+                offset = _buttonsHeight + 2 * _buttonsPadding;
+            }
+            else
+            {
+                rc = ClientRect;
+                offset = 0;
+            }
             win.ResizeAndMove(0, offset, rc.Width, rc.Height - offset);
         }
     }
@@ -208,6 +232,7 @@ public class PdfViewWindow : Window
     protected override DiagnosticsInformation CreateDiagnosticsInformation() => new(Assembly.GetExecutingAssembly(), this, ", ");
     protected override void Dispose(bool disposing)
     {
+        TracingUtilities.Trace($"disposing: {disposing}");
         base.Dispose(disposing);
         Interlocked.Exchange(ref _pdfWindow, null)?.Dispose();
         Interlocked.Exchange(ref _pdfPage, null)?.Dispose();
@@ -253,7 +278,7 @@ public class PdfViewWindow : Window
             RootVisual.Brush = Compositor.CreateSurfaceBrush(surface);
             using var interop = surface.AsComObject<ICompositionDrawingSurfaceInterop>();
             using var dc = interop.BeginDraw(null);
-            dc.Clear(D3DCOLORVALUE.LightGray);
+            dc.Clear(parent.BackgroundColor);
 
             if (parent._pdfPage != null && _pdfRendererNative != null)
             {
@@ -306,6 +331,7 @@ public class PdfViewWindow : Window
 
         protected override void Dispose(bool disposing)
         {
+            TracingUtilities.Trace($"disposing: {disposing}");
             base.Dispose(disposing);
             Interlocked.Exchange(ref _pdfRendererNative, null)?.Dispose();
         }

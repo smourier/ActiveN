@@ -2,6 +2,8 @@
 
 public enum ControlState
 {
+    New,
+    Loaded,
     Running,
     Active,
     InplaceActive,

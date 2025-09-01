@@ -17,7 +17,7 @@ public partial class EnumVerbs(IReadOnlyList<OLEVERB> verbs) : IEnumOLEVERB
     {
         TracingUtilities.Trace($"count: {count}");
         ArgumentNullException.ThrowIfNull(outVerbs);
-        var max = Math.Max(0, Math.Min(outVerbs.Length - (Index + 1), count));
+        var max = Math.Max(0, Math.Min(verbs.Count - (Index + 1), count));
         var fetched = max;
         if (fetched > 0)
         {

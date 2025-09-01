@@ -150,7 +150,17 @@ public abstract partial class BaseDispatch : IDisposable
 
                     var varArgs = (VARIANT*)pDispParams.rgvarg;
                     var setValue = Variant.Unwrap(varArgs[0]);
-                    TracingUtilities.Trace($"set value: {setValue}");
+                    TracingUtilities.Trace($"set value: {setValue} type: {setValue?.GetType().FullName} property type {property.PropertyType.FullName}");
+
+                    if (setValue != null && !setValue.GetType().IsAssignableTo(property.PropertyType))
+                    {
+                        if (Conversions.TryChangeObjectType(setValue, property.PropertyType, out var converted))
+                        {
+                            setValue = converted;
+                            TracingUtilities.Trace($"set converted value: {setValue} ({setValue?.GetType().FullName})");
+                        }
+                    }
+
                     property.SetValue(this, setValue);
                     return Constants.S_OK;
                 }
@@ -275,17 +285,18 @@ public abstract partial class BaseDispatch : IDisposable
         }
         catch (Exception ex)
         {
-            TracingUtilities.Trace($"Exception: {ex}");
+            TracingUtilities.Trace($"Error: {ex}");
             if (pExcepInfo != 0)
             {
                 var excepInfo = new EXCEPINFO
                 {
                     scode = unchecked((int)Constants.E_FAIL),
-                    bstrDescription = new Bstr(ex.GetAllMessages()),
+                    bstrDescription = new Bstr(ex.GetInterestingExceptionMessage()),
                 };
 
                 *(EXCEPINFO*)pExcepInfo = excepInfo;
             }
+            TracingUtilities.SetError(ex.GetInterestingExceptionMessage());
             return Constants.DISP_E_EXCEPTION;
         }
     }

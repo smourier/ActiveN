@@ -8,6 +8,7 @@
 		<IsAotCompatible>true</IsAotCompatible>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<Platforms>x64;x86;ARM64</Platforms>
+		<WindowsSdkPackageVersion>10.0.26100.57</WindowsSdkPackageVersion>
 
 		<!-- this is needed to generate a .runtimeconfig.json file (for DEBUG mode) -->
 		<EnableDynamicLoading>true</EnableDynamicLoading>
@@ -88,6 +89,7 @@
 		<Using Include="Windows.Data.Pdf" />
 		<Using Include="Windows.Graphics.DirectX" />
 		<Using Include="Windows.Foundation" />
+		<Using Include="Windows.Storage" />
 		<Using Include="Windows.Storage.Pickers" />
 		<Using Include="Windows.UI" />
 		<Using Include="Windows.UI.Composition" />

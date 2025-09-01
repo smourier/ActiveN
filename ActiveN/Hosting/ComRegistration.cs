@@ -27,6 +27,12 @@ public abstract partial class ComRegistration
             assemblies.Add(entry);
         }
 
+        var calling = Assembly.GetCallingAssembly();
+        if (calling != null)
+        {
+            assemblies.Add(calling);
+        }
+
         foreach (var type in comTypes)
         {
             assemblies.Add(type.Type.Assembly);
@@ -39,7 +45,14 @@ public abstract partial class ComRegistration
 
         _dllPath = new Lazy<string>(GetDllPath);
 
-        TracingUtilities.Trace($"Path: {DllPath} Types: {string.Join(", ", ComTypes.Select(t => t.Type.FullName))} entry asm: '{DllPath}'");
+        TracingUtilities.TraceToFile = true;
+        var process = SystemUtilities.CurrentProcess;
+        //if (process.ProcessName.EqualsIgnoreCase("devenv"))
+        //{
+        //    TracingUtilities.TraceToFile = true; // enable tracing when running from Visual Studio
+        //}
+
+        TracingUtilities.Trace($"Path: {DllPath} Types: {string.Join(", ", ComTypes.Select(t => t.Type.FullName))} entry asm: '{DllPath}' process: {process.MainModule?.FileName ?? process.ProcessName} lowbox: {SystemUtilities.IsAppContainer()}");
         RegisterEmbeddedTypeLib = ResourceUtilities.HasEmbeddedTypeLib(DllPath);
         TracingUtilities.Trace($"RegisterEmbeddedTypeLib: '{RegisterEmbeddedTypeLib}'");
     }
@@ -223,7 +236,7 @@ public abstract partial class ComRegistration
     protected virtual HRESULT CanUnloadNow() => TracingUtilities.WrapErrors(() =>
     {
         TracingUtilities.Trace($"Path: {DllPath} CanUnload: {CanUnload}");
-        TracingUtilities.FlushTextWriter(); // host asking to quit, it's a good time to flush traces
+        TracingUtilities.Flush(); // host asking to quit, it's a good time to flush traces
         return CanUnload ? (uint)Constants.S_OK : (uint)Constants.S_FALSE;
     });
 

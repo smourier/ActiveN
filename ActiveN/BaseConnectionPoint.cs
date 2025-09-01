@@ -4,38 +4,48 @@
 public abstract partial class BaseConnectionPoint : IConnectionPoint, IDisposable
 #pragma warning restore SYSLIB1097 // Add 'GeneratedComClassAttribute' to enable passing objects of this type to COM
 {
-    private readonly ConcurrentDictionary<uint, IComObject> _sinks = new();
+    private ConcurrentDictionary<uint, IComObject> _sinks = new();
     private uint _cookie;
     internal IConnectionPointContainer? _container;
 
     public IReadOnlyDictionary<uint, IComObject> Sinks => _sinks;
     public abstract Guid InterfaceId { get; }
+    public virtual bool IsIDispatch => false;
     protected abstract IComObject GetFromPointer(nint ptr);
 
     public override string ToString() => InterfaceId.ToString();
 
-    HRESULT IConnectionPoint.Advise(nint sink, out uint cookie)
+    HRESULT IConnectionPoint.Advise(nint sink, out uint pcookie)
     {
-        if (sink == 0)
+        TracingUtilities.Trace($"sink: {sink:X}, container: {_container}");
+        var cookie = 0u;
+        var hr = TracingUtilities.WrapErrors(() =>
         {
-            cookie = 0;
-            return Constants.E_POINTER;
-        }
+            if (sink == 0)
+            {
+                cookie = 0;
+                return Constants.E_POINTER;
+            }
 
-        var disp = GetFromPointer(sink);
-        if (disp == null)
-        {
-            cookie = 0;
-            return Constants.CONNECT_E_CANNOTCONNECT;
-        }
+            var sinkObj = GetFromPointer(sink);
+            if (sinkObj == null)
+            {
+                cookie = 0;
+                return Constants.CONNECT_E_CANNOTCONNECT;
+            }
 
-        cookie = Interlocked.Increment(ref _cookie);
-        _sinks[cookie] = disp;
-        return Constants.S_OK;
+            cookie = Interlocked.Increment(ref _cookie);
+            _sinks[cookie] = sinkObj;
+            TracingUtilities.Trace($"cookie: {cookie}");
+            return Constants.S_OK;
+        });
+        pcookie = cookie;
+        return hr;
     }
 
     HRESULT IConnectionPoint.EnumConnections(out IEnumConnections enumerator)
     {
+        TracingUtilities.Trace();
         enumerator = new EnumConnections([.. _sinks]);
         return Constants.S_OK;
     }
@@ -43,21 +53,24 @@ public abstract partial class BaseConnectionPoint : IConnectionPoint, IDisposabl
     HRESULT IConnectionPoint.GetConnectionInterface(out Guid interfaceId)
     {
         interfaceId = InterfaceId;
+        TracingUtilities.Trace($"{interfaceId.GetName()}");
         return Constants.S_OK;
     }
 
     HRESULT IConnectionPoint.GetConnectionPointContainer(out IConnectionPointContainer container)
     {
+        TracingUtilities.Trace($"{_container}");
         container = _container!;
         return container != null ? Constants.S_OK : Constants.E_FAIL;
     }
 
     HRESULT IConnectionPoint.Unadvise(uint cookie)
     {
-        if (!_sinks.TryRemove(cookie, out var disp))
+        TracingUtilities.Trace($"cookie: {cookie}");
+        if (!_sinks.TryRemove(cookie, out var sink))
             return Constants.E_UNEXPECTED;
 
-        disp?.Dispose();
+        sink?.Dispose();
         return Constants.S_OK;
     }
 
@@ -66,10 +79,12 @@ public abstract partial class BaseConnectionPoint : IConnectionPoint, IDisposabl
     {
         if (disposing)
         {
-            foreach (var kv in _sinks)
+            var sinks = Interlocked.Exchange(ref _sinks, new());
+            foreach (var kv in sinks)
             {
                 try
                 {
+                    TracingUtilities.Trace($"left sink: {kv.Value}");
                     kv.Value.Dispose();
                 }
                 catch
@@ -77,6 +92,7 @@ public abstract partial class BaseConnectionPoint : IConnectionPoint, IDisposabl
                     // continue
                 }
             }
+            _sinks.Clear();
             // dispose managed state (managed objects)
         }
 
