@@ -13,6 +13,8 @@ public abstract partial class ComRegistration
             throw new ArgumentException("At least one COM type must be specified.", nameof(comTypes));
 
         ComTypes = comTypes;
+        Application.CanShowFatalError = false;
+        Application.ExitAllOnLastWindowRemoved = false;
 
         // add all known assemblies that might have GUIDs to trace
         var assemblies = new HashSet<Assembly>
@@ -45,7 +47,7 @@ public abstract partial class ComRegistration
 
         _dllPath = new Lazy<string>(GetDllPath);
 
-        TracingUtilities.TraceToFile = true;
+        TracingUtilities.TraceToFile = false;
         var process = SystemUtilities.CurrentProcess;
         //if (process.ProcessName.EqualsIgnoreCase("devenv"))
         //{
@@ -75,13 +77,10 @@ public abstract partial class ComRegistration
     }
 #endif
 
-    protected virtual internal HRESULT CreateInstance(ClassFactory classFactory, nint pUnkOuter, in Guid riid, out object? instance)
+    protected virtual internal HRESULT CreateInstance(ClassFactory classFactory, in Guid riid, out object? instance)
     {
         ArgumentNullException.ThrowIfNull(classFactory);
         instance = null;
-        if (pUnkOuter != 0)
-            return Constants.CLASS_E_NOAGGREGATION;
-
         foreach (var comType in ComTypes)
         {
             if (classFactory.Clsid == comType.Type.GUID)
@@ -97,7 +96,6 @@ public abstract partial class ComRegistration
 
         return Constants.E_NOINTERFACE;
     }
-
 
     protected virtual ComRegistrationContext CreateRegistrationContext(RegistryKey root, ComRegistrationType type) => new(this, root, type);
     protected virtual ClassFactory CreateClassFactory(Guid clsid) => new(clsid, this);

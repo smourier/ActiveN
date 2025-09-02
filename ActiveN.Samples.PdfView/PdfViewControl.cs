@@ -75,6 +75,9 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
     HRESULT IPdfViewControl.get_Caption(out BSTR value) { value = new BSTR(Marshal.StringToBSTR(Caption)); return Constants.S_OK; }
     HRESULT IPdfViewControl.set_Caption(BSTR value) { Caption = value.ToString() ?? string.Empty; return Constants.S_OK; }
 
+    // category (for host that support a property grid editor like VB/VBA)
+    // can match PROPCAT_XXX or be a custom string
+    [Category("Appearance")]
     public bool ShowControls { get => Window?.ShowControls ?? true; set { if (Window != null) Window.ShowControls = value; } }
     HRESULT IPdfViewControl.get_ShowControls(out BOOL value) { value = ShowControls; return Constants.S_OK; }
     HRESULT IPdfViewControl.set_ShowControls(BOOL value) { ShowControls = value; return Constants.S_OK; }

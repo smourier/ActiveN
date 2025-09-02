@@ -233,10 +233,10 @@ public class PdfViewWindow : Window
     protected override void Dispose(bool disposing)
     {
         TracingUtilities.Trace($"disposing: {disposing}");
-        base.Dispose(disposing);
         Interlocked.Exchange(ref _pdfWindow, null)?.Dispose();
         Interlocked.Exchange(ref _pdfPage, null)?.Dispose();
         Interlocked.Exchange(ref _font, null)?.Dispose();
+        base.Dispose(disposing);
     }
 
     private enum ButtonId
@@ -332,8 +332,8 @@ public class PdfViewWindow : Window
         protected override void Dispose(bool disposing)
         {
             TracingUtilities.Trace($"disposing: {disposing}");
-            base.Dispose(disposing);
             Interlocked.Exchange(ref _pdfRendererNative, null)?.Dispose();
+            base.Dispose(disposing);
         }
     }
 }

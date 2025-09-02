@@ -1,7 +1,7 @@
 ﻿namespace ActiveN;
 
 [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)]
-public abstract partial class BaseDispatch : IDisposable
+public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface
 {
     private static readonly ConcurrentDictionary<Type, DispatchType> _cache = new();
 
@@ -14,6 +14,16 @@ public abstract partial class BaseDispatch : IDisposable
     protected abstract ComRegistration ComRegistration { get; }
 
     protected virtual int AutoDispidsBase => 0x10000;
+
+    protected virtual DispatchType CreateType([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)] Type type) => new(type);
+
+    CustomQueryInterfaceResult ICustomQueryInterface.GetInterface(ref Guid iid, out nint ppv) => GetInterface(ref iid, out ppv);
+    protected virtual CustomQueryInterfaceResult GetInterface(ref Guid iid, out nint ppv)
+    {
+        ppv = 0;
+        TracingUtilities.Trace($"iid: {iid.GetName()}");
+        return CustomQueryInterfaceResult.NotHandled;
+    }
 
     protected virtual ComObject<ITypeInfo>? EnsureTypeInfo()
     {
@@ -57,14 +67,14 @@ public abstract partial class BaseDispatch : IDisposable
     //     Dispose(disposing: false);
     // }
 
-    private DispatchType GetDispatchType()
+    protected virtual DispatchType GetDispatchType()
     {
         var type = GetType();
         if (!_cache.TryGetValue(type, out var dispatchType))
         {
             // we can load dispids from type info if they are declared in idl (Standard dispatch ID constants in olectl.h, like DISPID_HWND, etc.)
             // or build them using reflection
-            dispatchType = new DispatchType(type);
+            dispatchType = CreateType(type) ?? throw new InvalidOperationException();
 
             var ti = EnsureTypeInfo();
             if (ti != null)
@@ -346,153 +356,5 @@ public abstract partial class BaseDispatch : IDisposable
                 Functions.DispatchMessageW(msg);
             }
         } while (true);
-    }
-
-    private sealed class DispatchType([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)] Type type)
-    {
-        private readonly Dictionary<string, DispatchMember> _membersByName = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<int, DispatchMember> _memberByDispIds = [];
-        private readonly HashSet<string> _restrictedNames = new(StringComparer.OrdinalIgnoreCase);
-
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)]
-        public Type Type { get; } = type;
-
-        public unsafe void AddTypeInfoDispids(ITypeInfo typeInfo)
-        {
-            var typeAttr = TypeLib.GetAttributes(typeInfo);
-            if (!typeAttr.HasValue)
-                return;
-
-            for (uint i = 0; i < typeAttr.Value.cImplTypes; i++)
-            {
-                if (typeInfo.GetRefTypeOfImplType(i, out var href).IsError)
-                    continue;
-
-                if (typeInfo.GetRefTypeInfo(href, out var obj).IsError || obj == null)
-                    continue;
-
-                var typeName = TypeLib.GetName(obj, -1);
-                TracingUtilities.Trace($"type: '{typeName}'");
-
-                using var refTypeInfo = new ComObject<ITypeInfo>(obj);
-                var refTypeAttr = TypeLib.GetAttributes(refTypeInfo.Object);
-                if (!refTypeAttr.HasValue)
-                    continue;
-
-                for (uint f = 0; f < refTypeAttr.Value.cFuncs; f++)
-                {
-                    var funcDesc = TypeLib.GetFuncDesc(refTypeInfo.Object, f);
-                    if (!funcDesc.HasValue)
-                        continue;
-
-                    // skip restricted (QueryInterface, AddRef, Invoke, etc.)
-                    var name = TypeLib.GetName(refTypeInfo.Object, funcDesc.Value.memid);
-                    TracingUtilities.Trace($"funcDesc: id: {funcDesc.Value.memid} name:'{name}' kind: {funcDesc.Value.funckind} invkind: {funcDesc.Value.invkind} params: {funcDesc.Value.cParams} paramsOpt: {funcDesc.Value.cParamsOpt} flags: {funcDesc.Value.wFuncFlags}");
-                    if (name == null)
-                        continue;
-
-                    if (funcDesc.Value.wFuncFlags.HasFlag(FUNCFLAGS.FUNCFLAG_FRESTRICTED))
-                    {
-                        TracingUtilities.Trace($"restricted: {name}");
-                        _restrictedNames.Add(name);
-                        continue;
-                    }
-
-                    // if null, means the method/property is in the TLB but not in the actual type
-                    var memberInfo = (MemberInfo?)Type.GetProperty(name, BindingFlags.Public | BindingFlags.Instance)
-                        ?? Type.GetMethod(name, BindingFlags.Public | BindingFlags.Instance);
-
-                    var member = new DispatchMember(funcDesc.Value.memid, memberInfo);
-                    _membersByName[memberInfo?.Name ?? name] = member;
-                    _memberByDispIds[member.DispId] = member;
-                }
-            }
-        }
-
-        public void AddAutoDispids(int autoDispidsBase)
-        {
-            // note we don't support overloaded methods & properties
-            // add only members not already added by type info
-            var methods = Type.GetMethods(BindingFlags.Public | BindingFlags.Instance);
-            for (var i = 0; i < methods.Length; i++)
-            {
-                var method = methods[i];
-                if (_restrictedNames.Contains(method.Name))
-                    continue;
-
-                if (_membersByName.ContainsKey(method.Name))
-                    continue;
-
-                // allow developer to customize name & dispid using attributes
-                var name = method.GetCustomAttribute<ComAliasNameAttribute>()?.Value ?? method.Name;
-                var dispid = method.GetCustomAttribute<DispIdAttribute>()?.Value ?? autoDispidsBase + _membersByName.Count;
-
-                var member = new DispatchMember(dispid, method);
-                _membersByName[name] = member;
-                _memberByDispIds[member.DispId] = member;
-            }
-
-            var properties = Type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
-            for (var i = 0; i < properties.Length; i++)
-            {
-                var property = properties[i];
-                if (_restrictedNames.Contains(property.Name))
-                    continue;
-
-                if (_membersByName.ContainsKey(property.Name))
-                    continue;
-
-                // allow developer to customize name & dispid using attributes
-                var name = property.GetCustomAttribute<ComAliasNameAttribute>()?.Value ?? property.Name;
-                var dispid = property.GetCustomAttribute<DispIdAttribute>()?.Value ?? autoDispidsBase + _membersByName.Count;
-
-                var member = new DispatchMember(dispid, property);
-                _membersByName[name] = member;
-                _memberByDispIds[member.DispId] = member;
-            }
-
-#if DEBUG
-            foreach (var name in _restrictedNames)
-            {
-                TracingUtilities.Trace($"type: {Type.Name} restricted: {name}");
-            }
-
-            foreach (var kv in _memberByDispIds)
-            {
-                TracingUtilities.Trace($"type: {Type.Name} dispid: {kv.Key} => {kv.Value}");
-            }
-
-            foreach (var kv in _membersByName)
-            {
-                TracingUtilities.Trace($"type: {Type.Name} name: '{kv.Key}' => {kv.Value}");
-            }
-#endif
-        }
-
-        public MemberInfo? GetMemberInfo(int dispId)
-        {
-            if (!_memberByDispIds.TryGetValue(dispId, out var member))
-                return null;
-
-            return member.Info;
-        }
-
-        public bool TryGetDispId(string name, out int dispId)
-        {
-            dispId = 0;
-            if (!_membersByName.TryGetValue(name, out var member))
-                return false;
-
-            dispId = member.DispId;
-            return true;
-        }
-    }
-
-    private sealed class DispatchMember(int dispId, MemberInfo? info)
-    {
-        public int DispId { get; } = dispId;
-        public MemberInfo? Info { get; } = info; // if null, means the method/property is in the TLB but not in the actual type
-
-        public override string ToString() => $"{DispId}: {Info?.Name} ({Info?.MemberType})";
     }
 }

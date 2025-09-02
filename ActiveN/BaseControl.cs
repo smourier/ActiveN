@@ -22,8 +22,9 @@ public abstract partial class BaseControl : BaseDispatch,
     ISupportErrorInfo,
     IConnectionPointContainer,
     ISpecifyPropertyPages,
+    ICategorizeProperties,
     IRunnableObject,
-    ICustomQueryInterface
+    IAggregable
 {
     private readonly ConcurrentDictionary<Guid, IConnectionPoint> _connectionPoints = new();
     private readonly PropertyNotifySinkConnectionPoint _connectionPoint;
@@ -43,24 +44,49 @@ public abstract partial class BaseControl : BaseDispatch,
         TracingUtilities.Trace($"Created {GetType().FullName} ({GetType().GUID:B})");
         CurrentSafetyOptions = SupportedSafetyOptions;
         Functions.CreateOleAdviseHolder(out var obj).ThrowOnError();
+        _extent = GetOriginalExtent();
         _adviseHolder = new ComObject<IOleAdviseHolder>(obj);
         _connectionPoint = new PropertyNotifySinkConnectionPoint();
         AddConnectionPoint(_connectionPoint);
     }
 
     protected abstract Window CreateWindow(HWND parentHandle, RECT rect);
-
     protected virtual POINTERINACTIVE PointerActivationPolicy => POINTERINACTIVE.POINTERINACTIVE_ACTIVATEONENTRY;
     protected virtual OLEMISC MiscStatus => OLEMISC.OLEMISC_RECOMPOSEONRESIZE | OLEMISC.OLEMISC_CANTLINKINSIDE | OLEMISC.OLEMISC_INSIDEOUT | OLEMISC.OLEMISC_ACTIVATEWHENVISIBLE | OLEMISC.OLEMISC_SETCLIENTSITEFIRST;
     protected virtual VIEWSTATUS ViewStatus => VIEWSTATUS.VIEWSTATUS_OPAQUE | VIEWSTATUS.VIEWSTATUS_SOLIDBKGND;
     protected virtual uint SupportedSafetyOptions => Constants.INTERFACESAFE_FOR_UNTRUSTED_CALLER | Constants.INTERFACESAFE_FOR_UNTRUSTED_DATA;
     protected virtual uint CurrentSafetyOptions { get; set; }
     protected virtual Window? Window => _window;
+    protected virtual SIZE? NaturalExtent => null; // in HiMetric
     protected override HWND GetWindowHandle() => _window?.Handle ?? HWND.Null;
     protected virtual ControlState State { get; private set; }
-    protected bool IsDirty { get; set; }
+    protected virtual bool IsDirty { get; set; }
     protected bool InUserMode => GetAmbientProperty(DISPID.DISPID_AMBIENT_USERMODE, false);
     protected bool InDesignMode => !InUserMode;
+    protected virtual bool SupportsAggregation => true;
+    protected virtual nint OuterUnknown { get; set; }
+    protected virtual object? Outer { get; set; }
+    nint IAggregable.OuterUnknown { get => OuterUnknown; set => OuterUnknown = value; }
+    bool IAggregable.SupportsAggregation => SupportsAggregation;
+    object? IAggregable.Wrapper { get => Outer; set => Outer = value; }
+
+    protected virtual SIZE GetOriginalExtent()
+    {
+        var dpi = 96u;
+        var main = SystemUtilities.CurrentProcess.MainWindowHandle;
+        if (main == 0)
+        {
+            main = Window.FromProcess(SystemUtilities.CurrentProcess).FirstOrDefault(w => w.IsVisible && w.IsTopLevel)?.Handle ?? 0;
+            if (main != 0)
+            {
+                dpi = DpiUtilities.GetDpiForWindow(main).width;
+            }
+        }
+
+        var size = 192.PixelToHiMetric(dpi);
+        TracingUtilities.Trace($"dpi: {dpi} size: {size}");
+        return new SIZE(size, size);
+    }
 
     protected T? GetAmbientProperty<T>(DISPID dispid, T? defaultValue = default) => GetAmbientProperty((int)dispid, defaultValue);
     protected T? GetAmbientProperty<T>(int dispid, T? defaultValue = default)
@@ -317,6 +343,8 @@ public abstract partial class BaseControl : BaseDispatch,
             var window = CreateWindow(parentHandle, rect);
             if (window != null)
             {
+                // our window can be destroyed by parent as we're probably a child of it, so we need to track that
+                window.Destroyed += OnWindowDestroyed;
                 window.Resized += OnWindowResized;
                 window.FocusChanged += OnWindowFocusChanged;
                 window.Show();
@@ -325,6 +353,11 @@ public abstract partial class BaseControl : BaseDispatch,
         }
         return _window;
     });
+
+    protected virtual void OnWindowDestroyed(object? sender, EventArgs e)
+    {
+        DisposeWindow();
+    }
 
     protected virtual void OnWindowResized(object? sender, ValueEventArgs<(WindowResizedType ResizedType, SIZE Size)> e)
     {
@@ -355,11 +388,18 @@ public abstract partial class BaseControl : BaseDispatch,
             throw new ArgumentException($"Connection point with iid {iid.GetName()} is already registered", nameof(connectionPoint));
     }
 
-    CustomQueryInterfaceResult ICustomQueryInterface.GetInterface(ref Guid iid, out nint ppv) => GetInterface(ref iid, out ppv);
-    protected virtual CustomQueryInterfaceResult GetInterface(ref Guid iid, out nint ppv)
+    protected override CustomQueryInterfaceResult GetInterface(ref Guid iid, out nint ppv)
     {
         ppv = 0;
         TracingUtilities.Trace($"iid: {iid.GetName()}");
+
+        if (Outer != null)
+        {
+            ppv = DirectN.Extensions.Com.ComObject.ToComInstanceOfType(Outer, iid);
+            TracingUtilities.Trace($"outer unknown ppv: {ppv}");
+            if (ppv != 0)
+                return CustomQueryInterfaceResult.Handled;
+        }
         return CustomQueryInterfaceResult.NotHandled;
     }
 
@@ -387,6 +427,7 @@ public abstract partial class BaseControl : BaseDispatch,
         var window = Interlocked.Exchange(ref _window, null);
         if (window != null)
         {
+            window.Destroyed -= OnWindowDestroyed;
             window.Resized -= OnWindowResized;
             window.FocusChanged -= OnWindowFocusChanged;
             window.Dispose();
@@ -532,14 +573,15 @@ public abstract partial class BaseControl : BaseDispatch,
         var verb = (OLEIVERB)iVerb;
 
         // default if no rect provided
-        var pos = RECT.Sized(0, 0, 100, 100);
+        // note: posRect is in pixels
+        var pos = RECT.Sized(0, 0, 192, 192);
         if (lprcPosRect != 0)
         {
             pos = *(RECT*)lprcPosRect;
             TracingUtilities.Trace($"rcPosRect: {pos}");
         }
 
-        TracingUtilities.Trace($"iVerb: {verb} lpmsg: {lpmsg} pActiveSite: {pActiveSite} lindex: {lindex} hwndParent: {hwndParent} lprcPosRect: {pos}");
+        TracingUtilities.Trace($"iVerb: {verb} lpmsg: {lpmsg} pActiveSite: {pActiveSite} lindex: {lindex} hwndParent: {hwndParent} lprcPosRect: {lprcPosRect} pos: {pos}");
         var hr = verb switch
         {
             OLEIVERB.OLEIVERB_INPLACEACTIVATE => InplaceActivate(hwndParent, pos),
@@ -760,6 +802,9 @@ public abstract partial class BaseControl : BaseDispatch,
         var size = new SIZE();
         var hr = TracingUtilities.WrapErrors(() =>
         {
+            if (dwDrawAspect != DVASPECT.DVASPECT_CONTENT)
+                return Constants.DV_E_DVASPECT;
+
             size = _extent;
             TracingUtilities.Trace($"dwDrawAspect: {dwDrawAspect} lindex: {lindex} ptd: {ptd} size: {_extent}");
             return Constants.S_OK;
@@ -860,17 +905,16 @@ public abstract partial class BaseControl : BaseDispatch,
         if (dwAspect != DVASPECT.DVASPECT_CONTENT)
             return Constants.DV_E_DVASPECT;
 
-        var size = new SIZE { cx = 1000, cy = 1000 };
-        *(SIZE*)pSizel = size;
-        TracingUtilities.Trace($"sizel: {size}");
-
         var extentInfo = *(DVEXTENTINFO*)pExtentInfo;
         var mode = (DVEXTENTMODE)extentInfo.dwExtentMode;
         TracingUtilities.Trace($"extentInfo sizelProposed: {extentInfo.sizelProposed} mode: {mode}");
 
-        var p = (SIZE*)pSizel;
-        p->cx = -1;
-        p->cy = -1;
+        var natural = NaturalExtent;
+        if (natural == null)
+            return Constants.E_NOTIMPL;
+
+        *(SIZE*)pSizel = natural.Value;
+        TracingUtilities.Trace($"sizel: {natural.Value}");
         return Constants.S_OK;
     });
 
@@ -1291,5 +1335,35 @@ public abstract partial class BaseControl : BaseDispatch,
     {
         TracingUtilities.Trace($"fContained: {fContained}");
         return Constants.S_OK;
+    }
+
+    HRESULT ICategorizeProperties.MapPropertyToCategory(DISPID dispid, out PROPCAT ppropcat)
+    {
+        var propcat = PROPCAT.PROPCAT_Misc;
+        var hr = TracingUtilities.WrapErrors(() =>
+        {
+            var type = GetDispatchType();
+            propcat = type.GetMember((int)dispid)?.Category.Category ?? PROPCAT.PROPCAT_Misc;
+            TracingUtilities.Trace($"dispId: {dispid} cat: {propcat}");
+            return Constants.S_OK;
+        });
+        ppropcat = propcat;
+        return hr;
+    }
+
+    HRESULT ICategorizeProperties.GetCategoryName(PROPCAT propcat, uint lcid, out BSTR pbstrName)
+    {
+        var bstr = BSTR.Null;
+        var hr = TracingUtilities.WrapErrors(() =>
+        {
+            var type = GetDispatchType();
+            var category = type.GetCategory(propcat);
+            var name = category.GetLocalizedName(lcid);
+            bstr = new BSTR(Marshal.StringToBSTR(name));
+            TracingUtilities.Trace($"propcat: {propcat} lcid: {lcid} name: '{name}'");
+            return Constants.S_OK;
+        });
+        pbstrName = bstr;
+        return hr;
     }
 }

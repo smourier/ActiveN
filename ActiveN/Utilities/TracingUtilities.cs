@@ -151,6 +151,70 @@ public static class TracingUtilities
         }
     }
 
+    public static HRESULT WrapErrors(this Func<HRESULT> action, Action? actionOnError = null, [CallerMemberName] string? methodName = null, [CallerFilePath] string? filePath = null)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        try
+        {
+            var hr = action();
+            if (hr != 0)
+            {
+                Trace($"COM Error: {hr}", methodName, filePath);
+                if (actionOnError != null)
+                {
+                    try
+                    {
+                        actionOnError();
+                    }
+                    catch (Exception ex2)
+                    {
+                        Trace($"COM Error2: {ex2}", methodName, filePath);
+                        // continue;
+                    }
+                }
+            }
+            return hr;
+        }
+        catch (SecurityException se)
+        {
+            // transform this one as a well-known access denied
+            Trace($"Security Error: {se}", methodName, filePath);
+            SetError(se.GetInterestingExceptionMessage(), methodName, filePath);
+            if (actionOnError != null)
+            {
+                try
+                {
+                    actionOnError();
+                }
+                catch (Exception ex2)
+                {
+                    Trace($"Security Error2: {ex2}", methodName, filePath);
+                    // continue;
+                }
+            }
+            return Constants.E_ACCESSDENIED;
+        }
+        catch (Exception ex)
+        {
+            Trace($"Error: {ex}", methodName, filePath);
+            SetError(ex.GetInterestingExceptionMessage(), methodName, filePath);
+            if (actionOnError != null)
+            {
+                try
+                {
+                    actionOnError();
+                }
+                catch (Exception ex2)
+                {
+                    Trace($"Error2: {ex2}", methodName, filePath);
+                    // continue;
+                }
+            }
+
+            return ex.HResult;
+        }
+    }
+
     private static string? GetSource(string? methodName, string? filePath)
     {
         var source = methodName.Nullify();

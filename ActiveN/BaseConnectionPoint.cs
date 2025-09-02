@@ -1,7 +1,7 @@
 ﻿namespace ActiveN;
 
 #pragma warning disable SYSLIB1097 // Add 'GeneratedComClassAttribute' to enable passing objects of this type to COM
-public abstract partial class BaseConnectionPoint : IConnectionPoint, IDisposable
+public abstract partial class BaseConnectionPoint : IConnectionPoint, ICustomQueryInterface, IDisposable
 #pragma warning restore SYSLIB1097 // Add 'GeneratedComClassAttribute' to enable passing objects of this type to COM
 {
     private ConcurrentDictionary<uint, IComObject> _sinks = new();
@@ -14,6 +14,14 @@ public abstract partial class BaseConnectionPoint : IConnectionPoint, IDisposabl
     protected abstract IComObject GetFromPointer(nint ptr);
 
     public override string ToString() => InterfaceId.ToString();
+
+    CustomQueryInterfaceResult ICustomQueryInterface.GetInterface(ref Guid iid, out nint ppv) => GetInterface(ref iid, out ppv);
+    protected virtual CustomQueryInterfaceResult GetInterface(ref Guid iid, out nint ppv)
+    {
+        ppv = 0;
+        TracingUtilities.Trace($"iid: {iid.GetName()}");
+        return CustomQueryInterfaceResult.NotHandled;
+    }
 
     HRESULT IConnectionPoint.Advise(nint sink, out uint pcookie)
     {
