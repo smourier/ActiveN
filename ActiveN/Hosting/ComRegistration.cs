@@ -29,12 +29,6 @@ public abstract partial class ComRegistration
             assemblies.Add(entry);
         }
 
-        var calling = Assembly.GetCallingAssembly();
-        if (calling != null)
-        {
-            assemblies.Add(calling);
-        }
-
         foreach (var type in comTypes)
         {
             assemblies.Add(type.Type.Assembly);
@@ -77,7 +71,7 @@ public abstract partial class ComRegistration
     }
 #endif
 
-    protected virtual internal HRESULT CreateInstance(ClassFactory classFactory, in Guid riid, out object? instance)
+    protected virtual internal HRESULT CreateInstance(ClassFactory classFactory, out object? instance)
     {
         ArgumentNullException.ThrowIfNull(classFactory);
         instance = null;

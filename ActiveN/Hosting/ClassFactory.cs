@@ -26,20 +26,23 @@ public partial class ClassFactory(Guid clsid, ComRegistration registration) : IC
             if (pUnkOuter != 0 && iid != typeof(IUnknown).GUID)
                 return Constants.CLASS_E_NOAGGREGATION;
 
-            var hr = ComRegistration.CreateInstance(this, iid, out var instance);
+            var hr = ComRegistration.CreateInstance(this, out var instance);
             if (hr.IsError)
                 return hr;
 
-            if (pUnkOuter != 0)
+            if (pUnkOuter == 0)
             {
-                if (instance is not IAggregable aggregatable || !aggregatable.SupportsAggregation)
+                // no aggregation, just return the requested interface
+                ppv = DirectN.Extensions.Com.ComObject.GetOrCreateComInstance(instance, iid);
+            }
+            else
+            {
+                if (instance is not IAggregable aggregable || !aggregable.SupportsAggregation)
                     return Constants.CLASS_E_NOAGGREGATION;
 
-                aggregatable.OuterUnknown = pUnkOuter;
+                ppv = Aggregable.Aggregate(pUnkOuter, aggregable);
+                Marshal.QueryInterface(ppv, iid, out ppv);
             }
-
-            ppv = DirectN.Extensions.Com.ComObject.GetOrCreateComInstance(instance, iid);
-            ppv = Aggregable.Aggregate(pUnkOuter, ppv);
             return ppv == 0 ? Constants.E_NOINTERFACE : Constants.S_OK;
         });
         ppvObject = ppv;

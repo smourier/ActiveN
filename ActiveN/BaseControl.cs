@@ -1,6 +1,8 @@
 ﻿namespace ActiveN;
 
 [GeneratedComClass]
+[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.Interfaces)]
+// warning: * any* interface added here must also be added to IAggregable.AggregatableInterfaces
 public abstract partial class BaseControl : BaseDispatch,
     IOleObject,
     IOleControl,
@@ -64,11 +66,7 @@ public abstract partial class BaseControl : BaseDispatch,
     protected bool InUserMode => GetAmbientProperty(DISPID.DISPID_AMBIENT_USERMODE, false);
     protected bool InDesignMode => !InUserMode;
     protected virtual bool SupportsAggregation => true;
-    protected virtual nint OuterUnknown { get; set; }
-    protected virtual object? Outer { get; set; }
-    nint IAggregable.OuterUnknown { get => OuterUnknown; set => OuterUnknown = value; }
     bool IAggregable.SupportsAggregation => SupportsAggregation;
-    object? IAggregable.Wrapper { get => Outer; set => Outer = value; }
 
     protected virtual SIZE GetOriginalExtent()
     {
@@ -392,14 +390,6 @@ public abstract partial class BaseControl : BaseDispatch,
     {
         ppv = 0;
         TracingUtilities.Trace($"iid: {iid.GetName()}");
-
-        if (Outer != null)
-        {
-            ppv = DirectN.Extensions.Com.ComObject.ToComInstanceOfType(Outer, iid);
-            TracingUtilities.Trace($"outer unknown ppv: {ppv}");
-            if (ppv != 0)
-                return CustomQueryInterfaceResult.Handled;
-        }
         return CustomQueryInterfaceResult.NotHandled;
     }
 
