@@ -29,6 +29,7 @@ public abstract partial class BaseControl : BaseDispatch,
     IAggregable
 {
     private readonly ConcurrentDictionary<Guid, IConnectionPoint> _connectionPoints = new();
+    private readonly ConcurrentBag<Guid> _aggregableInterfacesIids;
     private readonly PropertyNotifySinkConnectionPoint _connectionPoint;
     private IComObject<IOleAdviseHolder>? _adviseHolder;
     private IComObject<IOleClientSite>? _clientSite;
@@ -50,6 +51,9 @@ public abstract partial class BaseControl : BaseDispatch,
         _adviseHolder = new ComObject<IOleAdviseHolder>(obj);
         _connectionPoint = new PropertyNotifySinkConnectionPoint();
         AddConnectionPoint(_connectionPoint);
+
+        AggregableInterfaces = ClassFactory.GetComAggregatedInterfaces(GetType());
+        _aggregableInterfacesIids = [.. AggregableInterfaces.Select(i => i.GUID)];
     }
 
     protected abstract Window CreateWindow(HWND parentHandle, RECT rect);
@@ -66,7 +70,11 @@ public abstract partial class BaseControl : BaseDispatch,
     protected bool InUserMode => GetAmbientProperty(DISPID.DISPID_AMBIENT_USERMODE, false);
     protected bool InDesignMode => !InUserMode;
     protected virtual bool SupportsAggregation => true;
+    protected virtual nint AggregationWrapper { get; set; }
+    protected virtual IReadOnlyList<Type> AggregableInterfaces { get; }
     bool IAggregable.SupportsAggregation => SupportsAggregation;
+    IReadOnlyList<Type> IAggregable.AggregableInterfaces => AggregableInterfaces;
+    nint IAggregable.Wrapper { get => AggregationWrapper; set => AggregationWrapper = value; }
 
     protected virtual SIZE GetOriginalExtent()
     {
@@ -390,6 +398,23 @@ public abstract partial class BaseControl : BaseDispatch,
     {
         ppv = 0;
         TracingUtilities.Trace($"iid: {iid.GetName()}");
+
+        if (!_aggregableInterfacesIids.Contains(iid))
+        {
+            var wrapper = AggregationWrapper;
+            if (wrapper != 0)
+            {
+                var hr = Aggregable.OuterQueryInterface(wrapper, iid, out ppv);
+                TracingUtilities.Trace($"iid: {iid.GetName()} hr: {hr}");
+                return hr.IsError ? CustomQueryInterfaceResult.Failed : CustomQueryInterfaceResult.Handled;
+            }
+#if DEBUG
+            throw new InvalidOperationException($"iid: {iid.GetName()} wrapper was not set");
+#else
+            return CustomQueryInterfaceResult.Failed;
+#endif
+        }
+
         return CustomQueryInterfaceResult.NotHandled;
     }
 

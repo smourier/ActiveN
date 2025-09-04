@@ -1,4 +1,5 @@
-﻿namespace ActiveN.Hosting;
+﻿
+namespace ActiveN.Hosting;
 
 [GeneratedComClass]
 public partial class ClassFactory(Guid clsid, ComRegistration registration) : IClassFactory, ICustomQueryInterface
@@ -41,7 +42,12 @@ public partial class ClassFactory(Guid clsid, ComRegistration registration) : IC
                     return Constants.CLASS_E_NOAGGREGATION;
 
                 ppv = Aggregable.Aggregate(pUnkOuter, aggregable);
-                Marshal.QueryInterface(ppv, iid, out ppv);
+                aggregable.Wrapper = ppv;
+                TracingUtilities.Trace($"aggregated: 0x{ppv:X}");
+                foreach (var type in aggregable.AggregableInterfaces)
+                {
+                    TracingUtilities.Trace($"  - {type.FullName} ({type.GUID.GetName()})");
+                }
             }
             return ppv == 0 ? Constants.E_NOINTERFACE : Constants.S_OK;
         });
@@ -53,5 +59,19 @@ public partial class ClassFactory(Guid clsid, ComRegistration registration) : IC
     {
         TracingUtilities.Trace($"lock: {fLock}");
         return Constants.S_OK;
+    }
+
+    public static IReadOnlyList<Type> GetComAggregatedInterfaces([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.Interfaces)] Type type)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        var list = new List<Type>();
+        foreach (var cp in type.GetInterfaces())
+        {
+            if (cp.IsDefined(typeof(GeneratedComInterfaceAttribute), true))
+            {
+                list.Add(cp);
+            }
+        }
+        return list;
     }
 }

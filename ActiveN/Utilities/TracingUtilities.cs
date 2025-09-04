@@ -2,6 +2,10 @@
 
 public static class TracingUtilities
 {
+    // for tracing only
+    [Guid("9a604ee7-e630-3ded-9444-baae247075ab")]
+    private partial interface IFormattable { }
+
     // write all traces on a single thread to avoid garbling the output
     private static int _threadId;
     private static TextWriter? _traceWriter;
