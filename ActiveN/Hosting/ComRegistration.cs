@@ -48,7 +48,7 @@ public abstract partial class ComRegistration
             TracingUtilities.TraceToFile = true; // enable tracing when running from Visual Studio
         }
 
-        TracingUtilities.Trace($"Path: {DllPath} Types: {string.Join(", ", ComTypes.Select(t => t.Type.FullName))} entry asm: '{DllPath}' process: {process.MainModule?.FileName ?? process.ProcessName} lowbox: {SystemUtilities.IsAppContainer()}");
+        TracingUtilities.Trace($"Path: {DllPath} bitness: {nint.Size} types: {string.Join(", ", ComTypes.Select(t => t.Type.FullName))} entry asm: '{DllPath}' process: {process.MainModule?.FileName ?? process.ProcessName} lowbox: {SystemUtilities.IsAppContainer()}");
         RegisterEmbeddedTypeLib = ResourceUtilities.HasEmbeddedTypeLib(DllPath);
         TracingUtilities.Trace($"RegisterEmbeddedTypeLib: '{RegisterEmbeddedTypeLib}'");
     }

@@ -186,7 +186,6 @@ public abstract partial class BaseControl : BaseDispatch,
     protected virtual void SetWindowPos(RECT position)
     {
         _window?.SetWindowPos(HWND.Null, position.left, position.top, position.Width, position.Height, SET_WINDOW_POS_FLAGS.SWP_NOZORDER | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE);
-        _inPlaceSite?.Object.OnPosRectChange(position);
     }
 
     protected virtual HRESULT Save(IStream stream, bool clearDirty)
@@ -435,11 +434,8 @@ public abstract partial class BaseControl : BaseDispatch,
                 TracingUtilities.Trace($"iid: {iid.GetName()} hr: {hr}");
                 return hr.IsError ? CustomQueryInterfaceResult.Failed : CustomQueryInterfaceResult.Handled;
             }
-#if DEBUG
-            throw new InvalidOperationException($"iid: {iid.GetName()} wrapper was not set");
-#else
-            return CustomQueryInterfaceResult.Failed;
-#endif
+
+            TracingUtilities.Trace($"iid: {iid.GetName()} wrapper was not set");
         }
 
         return CustomQueryInterfaceResult.NotHandled;
@@ -694,6 +690,7 @@ public abstract partial class BaseControl : BaseDispatch,
             _extentHimetric = size;
             var rc = new RECT(0, 0, _extentHimetric.cx.HiMetricToPixel(dpi), _extentHimetric.cy.HiMetricToPixel(dpi));
             SetWindowPos(rc);
+            _inPlaceSite?.Object.OnPosRectChange(rc);
             return Constants.S_OK;
         });
     }
@@ -893,6 +890,7 @@ public abstract partial class BaseControl : BaseDispatch,
 
             TracingUtilities.Trace($"window rcBounds: {rcBounds}");
             SetWindowPos(rcBounds);
+            _inPlaceSite?.Object.OnPosRectChange(rcBounds);
         }
         return Constants.S_OK;
     });
