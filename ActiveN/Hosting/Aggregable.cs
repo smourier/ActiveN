@@ -1,10 +1,15 @@
 ﻿namespace ActiveN.Hosting;
 
 // this implements something similar to this https://learn.microsoft.com/en-us/windows/win32/com/aggregation
-// note: due to GeneratedComInterface, AOT and trimming limitations,
-// we cannot use reflection to build vtables at runtime, dynamically, etc.
+// but we cannot really implement code as described in doc above
+// because .NET source generated ComWrappers seem to store private thing in the *this* pointer (see ComWrappers, ComInterfaceDispatch, ComInterfaceEntry cryptic code)
+// if we do that, it crashes in QueryInterface in various ways (AV, stack overflow, etc.)
+// hopefully that should not be needed for Release/AddRef, and QueryInterface is now handled here by OuterQueryInterface
+// note: due to GeneratedComInterface, AOT and trimming limitations, we cannot use reflection to build vtables at runtime, dynamically, etc.
 public unsafe class Aggregable
 {
+    private static readonly ConcurrentDictionary<WrapperGuid, object?> _tempIidStack = new();
+
     public static nint Aggregate(nint outer, IAggregable innerAggregable)
     {
         ArgumentNullException.ThrowIfNull(innerAggregable);
@@ -16,8 +21,8 @@ public unsafe class Aggregable
             throw new InvalidOperationException();
 
         // build a "wrapper" new vtable
-        var headerSize = sizeof(AggregatedClass);
-        var vtbl = (AggregatedClass*)Marshal.AllocCoTaskMem(headerSize);
+        var headerSize = sizeof(Aggregated);
+        var vtbl = (Aggregated*)Marshal.AllocCoTaskMem(headerSize);
         Unsafe.InitBlockUnaligned(vtbl, 0, (uint)headerSize);
 
         vtbl->IUnknownVtbl.QueryInterface = &IUnknownQueryInterface;
@@ -39,15 +44,23 @@ public unsafe class Aggregable
         return (nint)vtbl;
     }
 
-    public static HRESULT OuterQueryInterface(nint wrapper, in Guid riid, out nint ppv)
+    public static HRESULT OuterQueryInterface(nint wrapper, in Guid iid, out nint ppv)
     {
         if (wrapper == 0)
             throw new ArgumentException(null, nameof(wrapper));
 
-        var cls = (AggregatedClass*)wrapper;
-        HRESULT hr = Marshal.QueryInterface(cls->outer, riid, out ppv);
-        TracingUtilities.Trace($"outer: 0x{cls->outer:X} hr: 0x{hr:X} iid:{riid.GetName()} ifaceUnk: 0x{ppv:X}");
+        var cls = (Aggregated*)wrapper;
+
+        HRESULT hr = Marshal.QueryInterface(cls->outer, iid, out ppv);
+        TracingUtilities.Trace($"outer: 0x{cls->outer:X} hr: 0x{hr:X} iid:{iid.GetName()} ifaceUnk: 0x{ppv:X}");
+        // remember non served iids so we don't go infinite loop
         return hr;
+    }
+
+    private struct WrapperGuid
+    {
+        public Guid Iid;
+        public nint Wrapper;
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvStdcall)])]
@@ -59,7 +72,7 @@ public unsafe class Aggregable
         *ppv = 0;
 
         var iid = *riid;
-        var cls = (AggregatedClass*)thisPtr;
+        var cls = (Aggregated*)thisPtr;
         if (iid == typeof(IUnknown).GUID)
         {
             *ppv = thisPtr;
@@ -67,11 +80,7 @@ public unsafe class Aggregable
             return Constants.S_OK;
         }
 
-        // note we cannot really implement custom IUnknown handling here as described in doc above
-        // because .NET ComWrappers are different than classic COM objects
-        // but hopefully that should not be needed for Release/AddRef, and QueryInterface is handled by WrapperQueryInterface
-
-        // if the requested iid is one of the aggregable interfaces, we forward to inner
+        // if we know for sure the requested iid is one of the aggregable interfaces, we forward to inner
         HRESULT hr;
         for (var i = 0; i < cls->aggregableInterfaceIidsCount; i++)
         {
@@ -84,7 +93,7 @@ public unsafe class Aggregable
                 {
                     *ppv = ifaceUnk;
                     Interlocked.Increment(ref cls->refCount);
-                    // add a reference to outer
+                    //add a reference to outer
                     Marshal.AddRef(cls->outer);
                     return Constants.S_OK;
                 }
@@ -92,16 +101,33 @@ public unsafe class Aggregable
             }
         }
 
-        // forward QueryInterface to outer
-        hr = OuterQueryInterface(thisPtr, iid, out var outerUnk);
-        *ppv = outerUnk; // error or not
+        // else before we ask outer, we need to protect against infinite loops
+        // as the outer may call back to us in its QueryInterface implementation, like TSTCON tool does
+        var wg = new WrapperGuid { Iid = iid, Wrapper = thisPtr };
+
+        if (!_tempIidStack.TryAdd(wg, null))
+        {
+            TracingUtilities.Trace($"outer: 0x{cls->outer:X} iid:{iid.GetName()} already in stack");
+            return Constants.E_NOINTERFACE;
+        }
+
+        try
+        {
+            // forward QueryInterface to outer
+            hr = OuterQueryInterface(thisPtr, iid, out var outerUnk);
+            *ppv = outerUnk; // error or not
+        }
+        finally
+        {
+            _tempIidStack.Remove(wg, out _);
+        }
         return hr;
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvStdcall)])]
     private static uint IUnknownAddRef(nint thisPtr)
     {
-        var unk = (AggregatedClass*)thisPtr;
+        var unk = (Aggregated*)thisPtr;
         var ui = (uint)Interlocked.Increment(ref unk->refCount);
         TracingUtilities.Trace($"this: 0x{thisPtr:X} refCount: {-1 + unk->refCount} => {unk->refCount}");
         return ui;
@@ -110,7 +136,7 @@ public unsafe class Aggregable
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvStdcall)])]
     private static uint IUnknownRelease(nint thisPtr)
     {
-        var unk = (AggregatedClass*)thisPtr;
+        var unk = (Aggregated*)thisPtr;
         var c = Interlocked.Decrement(ref unk->refCount);
         TracingUtilities.Trace($"this: 0x{thisPtr:X} refCount: {1 + unk->refCount} => {unk->refCount}");
         if (c == 0)
@@ -121,7 +147,7 @@ public unsafe class Aggregable
         return (uint)c;
     }
 
-    private struct AggregatedClass
+    private struct Aggregated
     {
         public IUnknownVTable* lpVtbl; // *must* be first: pointer to vtable
         public IUnknownVTable IUnknownVtbl; // embedded IUnknown-only vtable
