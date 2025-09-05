@@ -143,6 +143,7 @@
 		<PropertyGroup>
 			<MidlEnv Condition="'$(Platform)' == 'x64'">x64</MidlEnv>
 			<MidlEnv Condition="'$(Platform)' == 'x86'">win32</MidlEnv>
+			<MidlEnv Condition="'$(Platform)' == 'ARM64'">arm64</MidlEnv>
 			<RcFileFlags Condition="'$(Configuration)' == 'Debug'">0x1L</RcFileFlags>
 			<RcFileFlags Condition="'$(Configuration)' != 'Debug'">0x0L</RcFileFlags>
 		</PropertyGroup>
