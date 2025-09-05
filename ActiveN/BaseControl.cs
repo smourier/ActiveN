@@ -39,7 +39,7 @@ public abstract partial class BaseControl : BaseDispatch,
     private IComObject<IObjectWithSite>? _site;
     private IComObject<IAdviseSink>? _adviseSink;
     private Window? _window;
-    private SIZE _extent;
+    private SIZE _extentHimetric;
     private int _freezeCount;
 
     public event EventHandler<ValueEventArgs<DISPID>>? AmbientPropertyChanged;
@@ -49,7 +49,7 @@ public abstract partial class BaseControl : BaseDispatch,
         TracingUtilities.Trace($"Created {GetType().FullName} ({GetType().GUID:B})");
         CurrentSafetyOptions = SupportedSafetyOptions;
         Functions.CreateOleAdviseHolder(out var obj).ThrowOnError();
-        _extent = GetOriginalExtent();
+        _extentHimetric = GetOriginalExtent();
         _adviseHolder = new ComObject<IOleAdviseHolder>(obj);
         _connectionPoint = new PropertyNotifySinkConnectionPoint();
         AddConnectionPoint(_connectionPoint);
@@ -74,25 +74,37 @@ public abstract partial class BaseControl : BaseDispatch,
     protected virtual bool SupportsAggregation => true;
     protected virtual nint AggregationWrapper { get; set; }
     protected virtual CTRLINFO KeyboardBehavior { get; set; } // CTRLINFO.CTRLINFO_EATS_RETURN | CTRLINFO.CTRLINFO_EATS_ESCAPE;
+    protected virtual IReadOnlyList<OleVerb> Verbs { get; set; } = [];
     protected virtual AcceleratorTable? KeyboardAccelerators { get; set; }
     protected virtual IReadOnlyList<Type> AggregableInterfaces { get; }
     bool IAggregable.SupportsAggregation => SupportsAggregation;
     IReadOnlyList<Type> IAggregable.AggregableInterfaces => AggregableInterfaces;
     nint IAggregable.Wrapper { get => AggregationWrapper; set => AggregationWrapper = value; }
 
-    protected virtual SIZE GetOriginalExtent()
+    protected virtual uint GetDpi()
     {
-        var dpi = 96u;
-        var main = SystemUtilities.CurrentProcess.MainWindowHandle;
-        if (main == 0)
+        var handle = GetWindowHandle();
+        if (handle == 0)
         {
-            main = Window.FromProcess(SystemUtilities.CurrentProcess).FirstOrDefault(w => w.IsVisible && w.IsTopLevel)?.Handle ?? 0;
-            if (main != 0)
+            _inPlaceSite?.Object.GetWindow(out handle);
+            if (handle == 0)
             {
-                dpi = DpiUtilities.GetDpiForWindow(main).width;
+                handle = SystemUtilities.CurrentProcess.MainWindowHandle;
+                if (handle == 0)
+                {
+                    handle = Window.FromProcess(SystemUtilities.CurrentProcess).FirstOrDefault(w => w.IsVisible && w.IsTopLevel)?.Handle ?? 0;
+                }
             }
         }
 
+        var dpi = handle != 0 ? DpiUtilities.GetDpiForWindow(handle).width : 96;
+        TracingUtilities.Trace($"found handle: 0x{handle:X} dpi: {dpi}");
+        return dpi;
+    }
+
+    protected virtual SIZE GetOriginalExtent()
+    {
+        var dpi = GetDpi();
         var size = 192.PixelToHiMetric(dpi);
         TracingUtilities.Trace($"dpi: {dpi} size: {size}");
         return new SIZE(size, size);
@@ -154,9 +166,27 @@ public abstract partial class BaseControl : BaseDispatch,
         return true;
     }
 
+    protected virtual void Draw(HDC hdc, RECT bounds)
+    {
+        TracingUtilities.Trace($"hdc: {hdc} bounds: {bounds}");
+    }
+
+    protected HRESULT DoVerb(int verbId, MSG? msg, IOleClientSite activeSite, HWND hwndParent)
+    {
+        var id = (OLEIVERB)verbId;
+        TracingUtilities.Trace($"iVerb: {id} lpmsg: {msg} pActiveSite: {activeSite} hwndParent: {hwndParent}");
+        foreach (var verb in Verbs)
+        {
+            if (verb.Verb.lVerb == id)
+                return verb.Invoke(msg, activeSite, hwndParent);
+        }
+        return Constants.E_NOTIMPL;
+    }
+
     protected virtual void SetWindowPos(RECT position)
     {
         _window?.SetWindowPos(HWND.Null, position.left, position.top, position.Width, position.Height, SET_WINDOW_POS_FLAGS.SWP_NOZORDER | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE);
+        _inPlaceSite?.Object.OnPosRectChange(position);
     }
 
     protected virtual HRESULT Save(IStream stream, bool clearDirty)
@@ -188,7 +218,6 @@ public abstract partial class BaseControl : BaseDispatch,
 
         if (_window != null)
         {
-            //_clientSite?.Object.OnShowWindow(false);
             DisposeWindow();
         }
 
@@ -298,14 +327,6 @@ public abstract partial class BaseControl : BaseDispatch,
         window?.Show();
         ((IOleInPlaceObject)this).SetObjectRects(pos, pos);
 
-        // in the case of hosted in VS, if .NET < 10, this fails if the control has no parent (Winforms Control)
-        //var info = new OLEINPLACEFRAMEINFO { cb = (uint)sizeof(OLEINPLACEFRAMEINFO) };
-        //_inPlaceSite.Object.GetWindowContext(out var frameObj, out var uiWindowObj, out var rcPos, out var clip, ref info).ThrowOnError();
-        //using var frame = frameObj != null ? new ComObject<IOleInPlaceFrame>(frameObj) : null;
-        //using var uiWindow = uiWindowObj != null ? new ComObject<IOleInPlaceUIWindow>(uiWindowObj) : null;
-        //TracingUtilities.Trace($"frameObj: {frame} uiWindo: {uiWindow} rcPos: {rcPos} clip: {clip} info hwnd: {info.hwndFrame}");
-
-        //pActiveSite.ShowObject().ThrowOnError();
         ChangeState(ControlState.InplaceActive);
         return Constants.S_OK;
     }
@@ -358,6 +379,7 @@ public abstract partial class BaseControl : BaseDispatch,
                 window.Resized += OnWindowResized;
                 window.FocusChanged += OnWindowFocusChanged;
                 window.Show();
+                _clientSite?.Object.OnShowWindow(true);
             }
             _window = window;
         }
@@ -366,6 +388,7 @@ public abstract partial class BaseControl : BaseDispatch,
 
     protected virtual void OnWindowDestroyed(object? sender, EventArgs e)
     {
+        _clientSite?.Object.OnShowWindow(false);
         DisposeWindow();
     }
 
@@ -616,13 +639,22 @@ public abstract partial class BaseControl : BaseDispatch,
 
     HRESULT IOleObject.EnumVerbs(out IEnumOLEVERB ppEnumOleVerb)
     {
-        TracingUtilities.Trace();
-        ppEnumOleVerb = new EnumVerbs([]);
+        TracingUtilities.Trace($"verbs: {Verbs.Count}");
+        ppEnumOleVerb = new EnumVerbs(Verbs);
         return Constants.S_OK;
     }
 
-    HRESULT IOleObject.Update() => NotImplemented();
-    HRESULT IOleObject.IsUpToDate() => NotImplemented();
+    HRESULT IOleObject.Update()
+    {
+        TracingUtilities.Trace();
+        return Constants.S_OK;
+    }
+
+    HRESULT IOleObject.IsUpToDate()
+    {
+        return Constants.S_OK;
+    }
+
     HRESULT IOleObject.GetUserClassID(out Guid pClsid)
     {
         var clsid = Guid.Empty;
@@ -654,11 +686,14 @@ public abstract partial class BaseControl : BaseDispatch,
         var size = psizel;
         return TracingUtilities.WrapErrors(() =>
         {
-            TracingUtilities.Trace($"dwDrawAspect: {dwDrawAspect} psizel: {size}");
+            var dpi = GetDpi();
+            TracingUtilities.Trace($"dwDrawAspect: {dwDrawAspect} psizel: {size} pixels: {size.HiMetricToPixel(dpi)}");
             if (dwDrawAspect != DVASPECT.DVASPECT_CONTENT)
                 return Constants.DV_E_DVASPECT;
 
-            _extent = size;
+            _extentHimetric = size;
+            var rc = new RECT(0, 0, _extentHimetric.cx.HiMetricToPixel(dpi), _extentHimetric.cy.HiMetricToPixel(dpi));
+            SetWindowPos(rc);
             return Constants.S_OK;
         });
     }
@@ -672,8 +707,8 @@ public abstract partial class BaseControl : BaseDispatch,
             if (dwDrawAspect != DVASPECT.DVASPECT_CONTENT)
                 return Constants.DV_E_DVASPECT;
 
-            size = _extent;
-            TracingUtilities.Trace($"psizel: {size}");
+            size = _extentHimetric;
+            TracingUtilities.Trace($"psizel: {size} pixels: {size.HiMetricToPixel(GetDpi())}");
             return Constants.S_OK;
         });
         psizel = size;
@@ -824,15 +859,15 @@ public abstract partial class BaseControl : BaseDispatch,
             if (dwDrawAspect != DVASPECT.DVASPECT_CONTENT)
                 return Constants.DV_E_DVASPECT;
 
-            size = _extent;
-            TracingUtilities.Trace($"dwDrawAspect: {dwDrawAspect} lindex: {lindex} ptd: {ptd} size: {_extent}");
+            size = _extentHimetric;
+            TracingUtilities.Trace($"dwDrawAspect: {dwDrawAspect} lindex: {lindex} ptd: {ptd} size: {_extentHimetric}");
             return Constants.S_OK;
         });
         lpsizel = size;
         return hr;
     }
 
-    HRESULT IViewObject.Draw(
+    unsafe HRESULT IViewObject.Draw(
         DVASPECT dwDrawAspect,
         int lindex,
         nint pvAspect,
@@ -844,10 +879,21 @@ public abstract partial class BaseControl : BaseDispatch,
         nint pfnContinue,
         nuint dwContinue) => TracingUtilities.WrapErrors(() =>
     {
-        TracingUtilities.Trace($"dwDrawAspect: {dwDrawAspect} lindex: {lindex} pvAspect: {pvAspect} ptd: {ptd} hdcTargetDev: {hdcTargetDev} hdcDraw: {hdcDraw} lprcBounds: {lprcBounds} lprcWBounds: {lprcWBounds} pfnContinue: {pfnContinue} dwContinue: {dwContinue}");
+        TracingUtilities.Trace($"dwDrawAspect: {dwDrawAspect} lindex: {lindex} pvAspect: {pvAspect} ptd: {ptd} hdcTargetDev: {hdcTargetDev} hdcDraw: {hdcDraw} lprcBounds: {lprcBounds} lprcWBounds: {lprcWBounds} pfnContinue: {pfnContinue} dwContinue: {dwContinue} window: {Window}");
         if (dwDrawAspect == DVASPECT.DVASPECT_DOCPRINT)
             return Constants.DV_E_DVASPECT;
 
+        // note if we're being called as non active
+        // we could get a window as parent but it can use a bad window (tested with Excel)
+        // instead we'll draw something simple or just do nothing
+        if (hdcDraw != 0 && lprcBounds != 0)
+        {
+            var rcBounds = *(RECT*)lprcBounds;
+            Draw(hdcDraw, rcBounds);
+
+            TracingUtilities.Trace($"window rcBounds: {rcBounds}");
+            SetWindowPos(rcBounds);
+        }
         return Constants.S_OK;
     });
 
@@ -939,7 +985,6 @@ public abstract partial class BaseControl : BaseDispatch,
 
     HRESULT IOleControl.GetControlInfo(ref CONTROLINFO pCI)
     {
-        TracingUtilities.Trace($"cb: {pCI.cb}");
         var accelerators = KeyboardAccelerators;
         if (accelerators != null && !accelerators.IsDisposed && accelerators.Count > 0)
         {
@@ -953,6 +998,7 @@ public abstract partial class BaseControl : BaseDispatch,
         }
 
         pCI.dwFlags = (uint)KeyboardBehavior;
+        TracingUtilities.Trace($"pCI.cAccel: {pCI.cAccel} pCI.hAccel: {pCI.hAccel} pCI.dwFlags: {pCI.dwFlags}");
         return Constants.S_OK;
     }
 
@@ -1259,9 +1305,9 @@ public abstract partial class BaseControl : BaseDispatch,
         var size = pSizel;
         return TracingUtilities.WrapErrors(() =>
         {
-            TracingUtilities.Trace($"pSizel: {size}");
-            _extent = size;
-            return Constants.S_OK;
+            _extentHimetric = size;
+            TracingUtilities.Trace($"pSizel: {size} pixels: {_extentHimetric.HiMetricToPixel(GetDpi())}");
+            return ((IOleObject)this).SetExtent(DVASPECT.DVASPECT_CONTENT, size);
         });
     }
 
@@ -1270,8 +1316,8 @@ public abstract partial class BaseControl : BaseDispatch,
         var size = new SIZE();
         var hr = TracingUtilities.WrapErrors(() =>
         {
-            TracingUtilities.Trace($"pSizel: {_extent}");
-            size = _extent;
+            size = _extentHimetric;
+            TracingUtilities.Trace($"pSizel: {size} pixels: {size.HiMetricToPixel(GetDpi())}");
             return Constants.S_OK;
         });
         pSizel = size;

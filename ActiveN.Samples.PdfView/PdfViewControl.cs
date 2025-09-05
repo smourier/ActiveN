@@ -11,6 +11,7 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
 {
     private readonly DispatchConnectionPoint _eventsConnectionPoint; // disposed by BaseControl
     private WindowsDispatcherQueueController? _dispatcherQueueController;
+    private Icon? _drawIcon;
 
     public PdfViewControl()
         : base()
@@ -35,6 +36,7 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
     {
         base.Dispose(disposing);
         Interlocked.Exchange(ref _dispatcherQueueController, null)?.Dispose();
+        Interlocked.Exchange(ref _drawIcon, null)?.Dispose();
     }
 
     #region Mandatory overrides
@@ -49,18 +51,34 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
         window.PageChanged += (s, e) => _eventsConnectionPoint.InvokeMember((int)PdfViewControlEventsDispIds.PageChanged);
         return window;
     }
-    #endregion
 
-    // note this is necesary to avoid trimming Task<T>.Result for AOT publishing
-    // all Task<T> results should be unwrapped here
-    // so you can return any type needed by public methods and properties returning Tasks
-    protected override object? GetTaskResult(Task task)
+    protected override void Draw(HDC hdc, RECT bounds)
     {
-        if (task is Task<string> s)
-            return s.Result;
+        if (hdc == 0)
+            return;
 
-        return null;
+        if (Window != null && Window.PageCount > 0)
+            return; // nothing to do, window will paint itself
+
+        // we can get here if we've not been activated yet 
+        // draw our icon centered & maxed in the bounds
+        const int iconSize = 256;
+        _drawIcon ??= Icon.Load(Functions.GetModuleHandleW(PWSTR.From(ComRegistration.DllPath)), 1, iconSize);
+        if (_drawIcon != null)
+        {
+            TracingUtilities.Trace($"Drawing icon {_drawIcon.Handle} in {bounds}");
+            var size = new SIZE(iconSize, iconSize);
+            var factor = size.GetScaleFactor(bounds.Width, bounds.Height);
+            var w = (int)(size.cx * factor.width);
+            var h = (int)(size.cy * factor.height);
+            var x = bounds.left + (bounds.Width - w) / 2;
+            var y = bounds.top + (bounds.Height - h) / 2;
+            TracingUtilities.Trace($"Drawing icon at {x},{y} {w}x{h}");
+            Functions.DrawIconEx(hdc, x, y, _drawIcon.Handle, w, h, 0, HBRUSH.Null, DI_FLAGS.DI_NORMAL);
+        }
     }
+
+    #endregion
 
     #region IDispatch implementation, static (IDL/TLB) and dynamic (reflection)
 #pragma warning disable CA1822 // Mark members as static; no since we're dealing with COM instance methods & properties
@@ -105,6 +123,16 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
             return Constants.E_INVALIDARG;
 
         OpenFile(str);
+        return Constants.S_OK;
+    }
+
+    public void OpenStream(IStream stream) => Window?.OpenStream(new StreamOnIStream(stream));
+    HRESULT IPdfViewControl.OpenStream(IStream stream)
+    {
+        if (stream == null)
+            return Constants.E_POINTER;
+
+        OpenStream(stream);
         return Constants.S_OK;
     }
 

@@ -9,7 +9,7 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface
     private bool _typeInfoLoaded;
     private bool _disposedValue;
 
-    protected abstract object? GetTaskResult(Task task);
+    protected virtual object? GetTaskResult(Task task) => null;
     protected abstract HWND GetWindowHandle();
     protected abstract ComRegistration ComRegistration { get; }
 

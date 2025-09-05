@@ -1,10 +1,10 @@
 ﻿namespace ActiveN;
 
 [GeneratedComClass]
-public partial class EnumVerbs(IReadOnlyList<OLEVERB> verbs) : IEnumOLEVERB
+public partial class EnumVerbs(IReadOnlyList<OleVerb> verbs) : IEnumOLEVERB
 {
     protected int Index { get; set; } = -1;
-    public IReadOnlyList<OLEVERB> Verbs => verbs ?? throw new ArgumentNullException(nameof(verbs));
+    public IReadOnlyList<OleVerb> Verbs => verbs ?? throw new ArgumentNullException(nameof(verbs));
 
     public virtual HRESULT Clone(out IEnumOLEVERB enumerator)
     {
@@ -23,7 +23,7 @@ public partial class EnumVerbs(IReadOnlyList<OLEVERB> verbs) : IEnumOLEVERB
         {
             for (var i = Index + 1; i < fetched; i++)
             {
-                outVerbs[i] = Verbs[i];
+                outVerbs[i] = Verbs[i].Verb;
                 Index++;
             }
         }

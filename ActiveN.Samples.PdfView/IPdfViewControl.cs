@@ -52,6 +52,10 @@ public partial interface IPdfViewControl : IDispatch
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT OpenStream(IStream stream);
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
     HRESULT CloseFile();
 
     [PreserveSig]

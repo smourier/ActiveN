@@ -19,6 +19,7 @@ public partial class HelloWorldControl : BaseControl, IHelloWorldControl
     // so you can return any type needed by public methods and properties returning Tasks
     protected override object? GetTaskResult(Task task)
     {
+        // string here is at least for the GetInfoAsync method below
         if (task is Task<string> s)
             return s.Result;
 

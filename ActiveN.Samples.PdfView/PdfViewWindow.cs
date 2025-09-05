@@ -73,23 +73,49 @@ public class PdfViewWindow : Window
         }
     }
 
+    public virtual async Task OpenStream(Stream stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        FilePath = null;
+        var pdfDocument = await PdfDocument.LoadFromStreamAsync(stream.AsRandomAccessStream());
+        Open(pdfDocument);
+
+        if (stream is FileStream fs)
+        {
+            FilePath = fs.Name;
+        }
+        else
+        {
+            FilePath = ":stream:";
+        }
+    }
+
     public virtual async Task OpenFile(string filePath)
     {
         ArgumentNullException.ThrowIfNull(filePath);
+        FilePath = null;
         var file = await StorageFile.GetFileFromPathAsync(filePath);
         if (file != null)
         {
             await OpenFile(file);
+            FilePath = filePath;
         }
     }
 
     public virtual async Task OpenFile(StorageFile file)
     {
         ArgumentNullException.ThrowIfNull(file);
+        var pdfDocument = await PdfDocument.LoadFromFileAsync(file);
+        FilePath = file.Path;
+        Open(pdfDocument);
+    }
+
+    protected virtual void Open(PdfDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
         try
         {
-            _pdfDocument = await PdfDocument.LoadFromFileAsync(file);
-            FilePath = file.Path;
+            _pdfDocument = document;
             _pdfPage?.Dispose();
 
             // this is not currently handled
