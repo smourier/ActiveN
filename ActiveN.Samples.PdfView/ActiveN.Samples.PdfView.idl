@@ -28,11 +28,6 @@ library ActiveNSamplesPdfViewLib
 		[propget, bindable, requestedit, id(DISPID_ENABLED)]
 			HRESULT Enabled([out, retval]VARIANT_BOOL* value);
 
-		[propput, bindable, requestedit, id(DISPID_CAPTION)]
-			HRESULT Caption([in]BSTR value);
-		[propget, bindable, requestedit, id(DISPID_CAPTION)]
-			HRESULT Caption([out, retval]BSTR* value);
-
 		[propput, bindable, requestedit, id(DISPID_BACKCOLOR)]
 			HRESULT BackColor([in]OLE_COLOR clr);
 		[propget, bindable, requestedit, id(DISPID_BACKCOLOR)]

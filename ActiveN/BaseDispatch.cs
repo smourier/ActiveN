@@ -85,7 +85,7 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface
 
             // add dispids for public methods and properties using reflection (not already added by type info).
             // AutoDispidsBase is the base value.
-            dispatchType.AddAutoDispids(AutoDispidsBase);
+            dispatchType.AddReflectionDispids(AutoDispidsBase);
 
             _cache[type] = dispatchType;
         }

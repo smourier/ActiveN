@@ -106,7 +106,7 @@ public class DispatchType([DynamicallyAccessedMembers(DynamicallyAccessedMemberT
         }
     }
 
-    public virtual void AddAutoDispids(int autoDispidsBase)
+    public virtual void AddReflectionDispids(int autoDispidsBase)
     {
         // note we don't support overloaded methods & properties
         // add only members not already added by type info
@@ -114,10 +114,17 @@ public class DispatchType([DynamicallyAccessedMembers(DynamicallyAccessedMemberT
         for (var i = 0; i < methods.Length; i++)
         {
             var method = methods[i];
+            if (method.Attributes.HasFlag(MethodAttributes.SpecialName)) // like get_ / set_ / add_ / remove_ / etc.
+                continue;
+
             if (_restrictedNames.Contains(method.Name))
                 continue;
 
             if (_membersByName.ContainsKey(method.Name))
+                continue;
+
+            var browsable = method.GetCustomAttribute<BrowsableAttribute>()?.Browsable;
+            if (browsable.HasValue && !browsable.Value)
                 continue;
 
             // allow developer to customize name & dispid using attributes
@@ -140,6 +147,10 @@ public class DispatchType([DynamicallyAccessedMembers(DynamicallyAccessedMemberT
             if (_membersByName.ContainsKey(property.Name))
                 continue;
 
+            var browsable = property.GetCustomAttribute<BrowsableAttribute>()?.Browsable;
+            if (browsable.HasValue && !browsable.Value)
+                continue;
+
             // allow developer to customize name & dispid using attributes
             var name = property.GetCustomAttribute<ComAliasNameAttribute>()?.Value ?? property.Name;
             var dispid = property.GetCustomAttribute<DispIdAttribute>()?.Value ?? autoDispidsBase + _membersByName.Count;
@@ -158,7 +169,7 @@ public class DispatchType([DynamicallyAccessedMembers(DynamicallyAccessedMemberT
 
         foreach (var kv in _memberByDispIds)
         {
-            TracingUtilities.Trace($"type: {Type.Name} dispid: {kv.Key} => {kv.Value}");
+            TracingUtilities.Trace($"type: {Type.Name} dispid: {kv.Key} (0x{kv.Key:X}) => {kv.Value}");
         }
 
         foreach (var kv in _membersByName)

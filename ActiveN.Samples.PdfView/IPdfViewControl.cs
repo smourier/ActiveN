@@ -7,19 +7,11 @@ public partial interface IPdfViewControl : IDispatch
 #pragma warning disable IDE1006 // Naming Styles
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
-    HRESULT get_Enabled(out BOOL value);
+    HRESULT get_Enabled(out VARIANT_BOOL value);
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
-    HRESULT set_Enabled(BOOL value);
-
-    [PreserveSig]
-    [return: MarshalAs(UnmanagedType.Error)]
-    HRESULT get_Caption(out BSTR value);
-
-    [PreserveSig]
-    [return: MarshalAs(UnmanagedType.Error)]
-    HRESULT set_Caption(BSTR value);
+    HRESULT set_Enabled(VARIANT_BOOL value);
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
@@ -31,11 +23,23 @@ public partial interface IPdfViewControl : IDispatch
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
-    HRESULT get_ShowControls(out BOOL value);
+    HRESULT get_ShowControls(out VARIANT_BOOL value);
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
-    HRESULT set_ShowControls(BOOL value);
+    HRESULT set_ShowControls(VARIANT_BOOL value);
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT get_PageCount(out int value);
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT get_IsPasswordProtected(out VARIANT_BOOL value);
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT get_FilePath(out BSTR value);
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]

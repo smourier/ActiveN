@@ -8,7 +8,7 @@ public abstract partial class BaseControl : BaseDispatch,
     IOleControl,
     IOleWindow,
     IObjectSafety,
-    IDataObject,
+    //IDataObject,
     IObjectWithSite,
     IOleInPlaceActiveObject,
     IOleInPlaceObject,
@@ -42,6 +42,8 @@ public abstract partial class BaseControl : BaseDispatch,
     private SIZE _extent;
     private int _freezeCount;
 
+    public event EventHandler<ValueEventArgs<DISPID>>? AmbientPropertyChanged;
+
     protected BaseControl()
     {
         TracingUtilities.Trace($"Created {GetType().FullName} ({GetType().GUID:B})");
@@ -71,6 +73,8 @@ public abstract partial class BaseControl : BaseDispatch,
     protected bool InDesignMode => !InUserMode;
     protected virtual bool SupportsAggregation => true;
     protected virtual nint AggregationWrapper { get; set; }
+    protected virtual CTRLINFO KeyboardBehavior { get; set; } // CTRLINFO.CTRLINFO_EATS_RETURN | CTRLINFO.CTRLINFO_EATS_ESCAPE;
+    protected virtual AcceleratorTable? KeyboardAccelerators { get; set; }
     protected virtual IReadOnlyList<Type> AggregableInterfaces { get; }
     bool IAggregable.SupportsAggregation => SupportsAggregation;
     IReadOnlyList<Type> IAggregable.AggregableInterfaces => AggregableInterfaces;
@@ -730,8 +734,8 @@ public abstract partial class BaseControl : BaseDispatch,
         var hr = TracingUtilities.WrapErrors(() =>
         {
             var ti = EnsureTypeInfo();
-            TracingUtilities.Trace($"ppTI: {ti}");
             pti = ti?.Object;
+            TracingUtilities.Trace($"ppTI: {pti}");
             return pti != null ? Constants.S_OK : Constants.E_UNEXPECTED;
         });
         ppTI = pti!;
@@ -805,7 +809,7 @@ public abstract partial class BaseControl : BaseDispatch,
         var hr = TracingUtilities.WrapErrors(() =>
         {
             classID = GetType().GUID;
-            TracingUtilities.Trace();
+            TracingUtilities.Trace($"pClassID: {classID}");
             return Constants.S_OK;
         });
         pClassID = classID;
@@ -933,7 +937,25 @@ public abstract partial class BaseControl : BaseDispatch,
         return Constants.S_OK;
     });
 
-    HRESULT IOleControl.GetControlInfo(ref CONTROLINFO pCI) { pCI = new(); return NotImplemented(); }
+    HRESULT IOleControl.GetControlInfo(ref CONTROLINFO pCI)
+    {
+        TracingUtilities.Trace($"cb: {pCI.cb}");
+        var accelerators = KeyboardAccelerators;
+        if (accelerators != null && !accelerators.IsDisposed && accelerators.Count > 0)
+        {
+            pCI.cAccel = (ushort)accelerators.Count;
+            pCI.hAccel = accelerators.Handle;
+        }
+        else
+        {
+            pCI.cAccel = 0;
+            pCI.hAccel = HACCEL.Null;
+        }
+
+        pCI.dwFlags = (uint)KeyboardBehavior;
+        return Constants.S_OK;
+    }
+
     HRESULT IOleControl.OnMnemonic(in MSG pMsg)
     {
         var msg = pMsg;
@@ -944,10 +966,12 @@ public abstract partial class BaseControl : BaseDispatch,
         });
     }
 
+    protected virtual void OnAmbientPropertyChanged(object sender, ValueEventArgs<DISPID> e) => AmbientPropertyChanged?.Invoke(this, e);
     HRESULT IOleControl.OnAmbientPropertyChange(int dispID) => TracingUtilities.WrapErrors(() =>
     {
         var dispid = (DISPID)dispID;
         TracingUtilities.Trace($"dispID: {dispid}");
+        OnAmbientPropertyChanged(this, new(dispid));
         return Constants.S_OK;
     });
 
@@ -1040,15 +1064,15 @@ public abstract partial class BaseControl : BaseDispatch,
         return hr;
     }
 
-    HRESULT IDataObject.GetData(in FORMATETC pformatetcIn, out STGMEDIUM pmedium) { pmedium = new(); return NotImplemented(); }
-    HRESULT IDataObject.GetDataHere(in FORMATETC pformatetc, ref STGMEDIUM pmedium) => NotImplemented();
-    HRESULT IDataObject.QueryGetData(in FORMATETC pformatetc) => NotImplemented();
-    HRESULT IDataObject.GetCanonicalFormatEtc(in FORMATETC pformatectIn, out FORMATETC pformatetcOut) { pformatetcOut = new(); return NotImplemented(); }
-    HRESULT IDataObject.SetData(in FORMATETC pformatetc, in STGMEDIUM pmedium, BOOL fRelease) => NotImplemented();
-    HRESULT IDataObject.EnumFormatEtc(uint dwDirection, out IEnumFORMATETC ppenumFormatEtc) { ppenumFormatEtc = null!; return NotImplemented(); }
-    HRESULT IDataObject.DAdvise(in FORMATETC pformatetc, uint advf, IAdviseSink pAdvSink, out uint pdwConnection) { pdwConnection = 0; return NotImplemented(); }
-    HRESULT IDataObject.DUnadvise(uint dwConnection) => NotImplemented();
-    HRESULT IDataObject.EnumDAdvise(out IEnumSTATDATA ppenumAdvise) { ppenumAdvise = null!; return NotImplemented(); }
+    //HRESULT IDataObject.GetData(in FORMATETC pformatetcIn, out STGMEDIUM pmedium) { pmedium = new(); return NotImplemented(); }
+    //HRESULT IDataObject.GetDataHere(in FORMATETC pformatetc, ref STGMEDIUM pmedium) => NotImplemented();
+    //HRESULT IDataObject.QueryGetData(in FORMATETC pformatetc) => NotImplemented();
+    //HRESULT IDataObject.GetCanonicalFormatEtc(in FORMATETC pformatectIn, out FORMATETC pformatetcOut) { pformatetcOut = new(); return NotImplemented(); }
+    //HRESULT IDataObject.SetData(in FORMATETC pformatetc, in STGMEDIUM pmedium, BOOL fRelease) => NotImplemented();
+    //HRESULT IDataObject.EnumFormatEtc(uint dwDirection, out IEnumFORMATETC ppenumFormatEtc) { ppenumFormatEtc = null!; return NotImplemented(); }
+    //HRESULT IDataObject.DAdvise(in FORMATETC pformatetc, uint advf, IAdviseSink pAdvSink, out uint pdwConnection) { pdwConnection = 0; return NotImplemented(); }
+    //HRESULT IDataObject.DUnadvise(uint dwConnection) => NotImplemented();
+    //HRESULT IDataObject.EnumDAdvise(out IEnumSTATDATA ppenumAdvise) { ppenumAdvise = null!; return NotImplemented(); }
 
     HRESULT IObjectWithSite.SetSite(nint pUnkSite) => TracingUtilities.WrapErrors(() =>
     {
@@ -1086,7 +1110,7 @@ public abstract partial class BaseControl : BaseDispatch,
         using var container = _clientSite.As<IOleControlSite>();
         if (container != null)
         {
-            var km = Win32Utilities.GetKEYMODIFIERS();
+            var km = KeyboardUtilities.GetKEYMODIFIERS();
             var hr = container.Object.TranslateAccelerator(msg, km);
             TracingUtilities.Trace($"km: {km} hr: {hr}");
             return hr.IsSuccess ? Constants.S_OK : Constants.S_FALSE;
@@ -1336,7 +1360,7 @@ public abstract partial class BaseControl : BaseDispatch,
 
     BOOL IRunnableObject.IsRunning()
     {
-        TracingUtilities.Trace();
+        TracingUtilities.Trace("true");
         return true;
     }
 

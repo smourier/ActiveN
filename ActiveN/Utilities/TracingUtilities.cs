@@ -6,6 +6,12 @@ public static class TracingUtilities
     [Guid("9a604ee7-e630-3ded-9444-baae247075ab")]
     private partial interface IFormattable { }
 
+    [Guid("049948d1-5686-11cf-8e0d-00aa00a74c5c")]
+    private partial interface IPersistHTML { }
+
+    [Guid("e19c7100-9709-4db7-9373-e7b518b47086")]
+    private partial interface IOfficeSafetyRelated { }
+
     // write all traces on a single thread to avoid garbling the output
     private static int _threadId;
     private static TextWriter? _traceWriter;
@@ -38,7 +44,7 @@ public static class TracingUtilities
 
                     Directory.SetCurrentDirectory(dir);
                     _traceWriter = new StreamWriter(Path.Combine(dir, $"{Guid.NewGuid():N}.ActiveN.log")) { AutoFlush = true };
-                    _traceWriter?.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}][{_threadId}]Log starting, process: {SystemUtilities.CurrentProcess.MainModule?.FileName ?? SystemUtilities.CurrentProcess.ProcessName} lowbox: {SystemUtilities.IsAppContainer()}");
+                    _traceWriter?.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}][{_threadId}]Log starting, bitness: {nint.Size} process: {SystemUtilities.CurrentProcess.MainModule?.FileName ?? SystemUtilities.CurrentProcess.ProcessName} lowbox: {SystemUtilities.IsAppContainer()}");
                     return true;
                 });
             }

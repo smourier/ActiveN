@@ -68,19 +68,24 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
     // COM visible public properties exposed through IPdfView IDL should go here
     // types of properties here must convertible into variants or must implement from IValueGet
     public bool Enabled { get; set; } = true;
-    HRESULT IPdfViewControl.get_Enabled(out BOOL value) { value = Enabled; return Constants.S_OK; }
-    HRESULT IPdfViewControl.set_Enabled(BOOL value) { Enabled = value; return Constants.S_OK; }
+    HRESULT IPdfViewControl.get_Enabled(out VARIANT_BOOL value) { value = Enabled; return Constants.S_OK; }
+    HRESULT IPdfViewControl.set_Enabled(VARIANT_BOOL value) { Enabled = value; return Constants.S_OK; }
 
-    public string Caption { get => Window?.FilePath ?? string.Empty; set { } }
-    HRESULT IPdfViewControl.get_Caption(out BSTR value) { value = new BSTR(Marshal.StringToBSTR(Caption)); return Constants.S_OK; }
-    HRESULT IPdfViewControl.set_Caption(BSTR value) { Caption = value.ToString() ?? string.Empty; return Constants.S_OK; }
+    public string FilePath => Window?.FilePath ?? string.Empty;
+    HRESULT IPdfViewControl.get_FilePath(out BSTR value) { value = new BSTR(Marshal.StringToBSTR(FilePath)); return Constants.S_OK; }
+
+    public int PageCount => Window?.PageCount ?? 0;
+    HRESULT IPdfViewControl.get_PageCount(out int value) { value = PageCount; return Constants.S_OK; }
+
+    public bool IsPasswordProtected => Window?.IsPasswordProtected ?? false;
+    HRESULT IPdfViewControl.get_IsPasswordProtected(out VARIANT_BOOL value) { value = IsPasswordProtected; return Constants.S_OK; }
 
     // category (for host that support a property grid editor like VB/VBA)
     // can match PROPCAT_XXX or be a custom string
     [Category("Appearance")]
     public bool ShowControls { get => Window?.ShowControls ?? true; set { if (Window != null) Window.ShowControls = value; } }
-    HRESULT IPdfViewControl.get_ShowControls(out BOOL value) { value = ShowControls; return Constants.S_OK; }
-    HRESULT IPdfViewControl.set_ShowControls(BOOL value) { ShowControls = value; return Constants.S_OK; }
+    HRESULT IPdfViewControl.get_ShowControls(out VARIANT_BOOL value) { value = ShowControls; return Constants.S_OK; }
+    HRESULT IPdfViewControl.set_ShowControls(VARIANT_BOOL value) { ShowControls = value; return Constants.S_OK; }
 
     public D3DCOLORVALUE BackColor { get => Window?.BackgroundColor ?? D3DCOLORVALUE.White; set { if (Window != null) Window.BackgroundColor = value; } }
     HRESULT IPdfViewControl.get_BackColor(out uint value) { value = BackColor.UInt32Value; return Constants.S_OK; }

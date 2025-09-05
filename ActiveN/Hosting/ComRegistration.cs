@@ -41,7 +41,7 @@ public abstract partial class ComRegistration
 
         _dllPath = new Lazy<string>(GetDllPath);
 
-        TracingUtilities.TraceToFile = false;
+        TracingUtilities.TraceToFile = true;
         var process = SystemUtilities.CurrentProcess;
         //if (process.ProcessName.EqualsIgnoreCase("devenv"))
         //{
