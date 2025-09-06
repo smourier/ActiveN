@@ -4,4 +4,7 @@
 [GeneratedComInterface]
 public partial interface ISimple
 {
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT Add(double left, double right, out double ret);
 }

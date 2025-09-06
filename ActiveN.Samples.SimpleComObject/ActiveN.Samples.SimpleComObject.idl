@@ -22,6 +22,14 @@ library ActiveNSamplesSimpleComObjectLib
 	]
 	interface ISimpleDual : IDispatch
 	{
+		// properties must match SimpleComObject's public properties
+		[propput]
+		HRESULT Name([in]BSTR strCaption);
+		[propget]
+			HRESULT Name([out, retval]BSTR* pstrCaption);
+
+		// for Idispatch support, methods must match SimpleComObject's public methods 
+		HRESULT Multiply(double left, double right, [out, retval] double* ret);
 	};
 
 	[
@@ -33,6 +41,7 @@ library ActiveNSamplesSimpleComObjectLib
 	]
 	interface ISimple : IUnknown
 	{
+		HRESULT Add(double left, double right, [out, retval] double* ret);
 	};
 
 	[

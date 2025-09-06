@@ -30,15 +30,6 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
         AddConnectionPoint(_eventsConnectionPoint);
     }
 
-    public new PdfViewWindow? Window => (PdfViewWindow?)base.Window; // disposed by BaseControl
-
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-        Interlocked.Exchange(ref _dispatcherQueueController, null)?.Dispose();
-        Interlocked.Exchange(ref _drawIcon, null)?.Dispose();
-    }
-
     #region Mandatory overrides
     protected override ComRegistration ComRegistration => ComHosting.Instance;
     protected override Window CreateWindow(HWND parentHandle, RECT rect)
@@ -50,6 +41,17 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
         window.FileClosed += (s, e) => _eventsConnectionPoint.InvokeMember((int)PdfViewControlEventsDispIds.FileClosed);
         window.PageChanged += (s, e) => _eventsConnectionPoint.InvokeMember((int)PdfViewControlEventsDispIds.PageChanged);
         return window;
+    }
+    #endregion
+
+    #region other overrides
+    public new PdfViewWindow? Window => (PdfViewWindow?)base.Window; // disposed by BaseControl
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        Interlocked.Exchange(ref _dispatcherQueueController, null)?.Dispose();
+        Interlocked.Exchange(ref _drawIcon, null)?.Dispose();
     }
 
     protected override void Draw(HDC hdc, RECT bounds)
@@ -77,7 +79,6 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
             Functions.DrawIconEx(hdc, x, y, _drawIcon.Handle, w, h, 0, HBRUSH.Null, DI_FLAGS.DI_NORMAL);
         }
     }
-
     #endregion
 
     #region IDispatch implementation, static (IDL/TLB) and dynamic (reflection)
