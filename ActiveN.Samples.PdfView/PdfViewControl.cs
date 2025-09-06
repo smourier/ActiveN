@@ -68,7 +68,7 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
         _drawIcon ??= Icon.Load(Functions.GetModuleHandleW(PWSTR.From(ComRegistration.DllPath)), 1, iconSize);
         if (_drawIcon != null)
         {
-            TracingUtilities.Trace($"Drawing icon {_drawIcon.Handle} in {bounds}");
+            TracingUtilities.Trace($"Drawing icon (size: {iconSize}) {_drawIcon.Handle} in {bounds}");
             var size = new SIZE(iconSize, iconSize);
             var factor = size.GetScaleFactor(bounds.Width, bounds.Height);
             var w = (int)(size.cx * factor.width);
@@ -112,6 +112,9 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
 
     public HWND HWND => GetWindowHandle();
     HRESULT IPdfViewControl.get_HWND(out nint value) { value = HWND; return Constants.S_OK; }
+
+    [DispId(unchecked((int)DISPID.DISPID_CAPTION))]
+    public string Caption { get; set; } = "ActiveN PdfViewControl";
 
     public void OpenFile(string filePath)
     {

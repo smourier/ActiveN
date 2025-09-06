@@ -35,7 +35,10 @@ public unsafe class Aggregable
 
         var interfaceIds = innerAggregable.AggregableInterfaces.Select(i => i.GUID).ToArray();
         vtbl->aggregableInterfaceIidsCount = interfaceIds.Length;
-        vtbl->aggregableInterfaceIids = (Guid*)Marshal.AllocCoTaskMem(sizeof(Guid) * interfaceIds.Length);
+
+        var aggregableInterfaceIidsFieldSize = sizeof(Guid) * interfaceIds.Length;
+        vtbl->aggregableInterfaceIids = (Guid*)Marshal.AllocCoTaskMem(aggregableInterfaceIidsFieldSize);
+        Unsafe.InitBlockUnaligned(vtbl->aggregableInterfaceIids, 0, (uint)aggregableInterfaceIidsFieldSize);
         for (int i = 0; i < interfaceIds.Length; i++)
         {
             vtbl->aggregableInterfaceIids[i] = interfaceIds[i];

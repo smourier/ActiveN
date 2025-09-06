@@ -8,6 +8,7 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface
     private ComObject<ITypeInfo>? _typeInfo;
     private bool _typeInfoLoaded;
     private bool _disposedValue;
+    public bool IsDisposed => _disposedValue;
 
     protected virtual object? GetTaskResult(Task task) => null;
     protected virtual HWND GetWindowHandle() => HWND.Null;

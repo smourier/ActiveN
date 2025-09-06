@@ -76,7 +76,7 @@ library ActiveNSamplesPdfViewLib
 		[propget, bindable, requestedit]
 			HRESULT IsPasswordProtected([out, retval] VARIANT_BOOL* value);
 
-		[propget, bindable, requestedit, id(DISPID_CAPTION)]
+		[propget, bindable, requestedit]
 			HRESULT FilePath([out, retval] BSTR* value);
 
 		[propget, bindable, requestedit, id(DISPID_HWND)]

@@ -12,7 +12,6 @@ public partial class HelloWorldControl : BaseControl, IHelloWorldControl
     #region Mandatory overrides
     protected override ComRegistration ComRegistration => ComHosting.Instance;
     protected override Window CreateWindow(HWND parentHandle, RECT rect) => new HelloWorldWindow(parentHandle, GetDefaultWindowStyle(parentHandle), rect);
-    #endregion
 
     // note this is necesary to avoid trimming Task<T>.Result for AOT publishing
     // all Task<T> results should be unwrapped here
@@ -24,6 +23,15 @@ public partial class HelloWorldControl : BaseControl, IHelloWorldControl
             return s.Result;
 
         return null;
+    }
+    #endregion
+
+    protected override void Draw(HDC hdc, RECT bounds)
+    {
+        if (hdc == 0)
+            return;
+
+        HelloWorldWindow.Paint(hdc, bounds);
     }
 
     #region IDispatch implementation, static (IDL/TLB) and dynamic (reflection)
@@ -50,7 +58,7 @@ public partial class HelloWorldControl : BaseControl, IHelloWorldControl
     // 2. look for explicit DispId as a .NET attribute
     // 3. assign dispids automatically starting from AutoDispidsBase (0x10000 by default)
     [DispId(0x20000)]
-    [ComAliasName("__id")] // example of alias name for IDispatch (Excel likes this attribute)
+    [ComAliasName("__id")] // example of alias name for IDispatch (Office seems to like this attribute)
     public int Id { get; set; }
 
     // this is not in the IDL, but it works (IDispatch + automatic dispid)

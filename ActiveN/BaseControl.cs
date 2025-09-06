@@ -8,7 +8,7 @@ public abstract partial class BaseControl : BaseDispatch,
     IOleControl,
     IOleWindow,
     IObjectSafety,
-    //IDataObject,
+    IDataObject,
     IObjectWithSite,
     IOleInPlaceActiveObject,
     IOleInPlaceObject,
@@ -32,6 +32,7 @@ public abstract partial class BaseControl : BaseDispatch,
     private readonly ConcurrentBag<Guid> _aggregableInterfacesIids;
     private readonly PropertyNotifySinkConnectionPoint _connectionPoint;
     private IComObject<IOleAdviseHolder>? _adviseHolder;
+    private IComObject<IDataAdviseHolder>? _dataAdviseHolder;
     private IComObject<IOleClientSite>? _clientSite;
     private IComObject<IOleInPlaceSite>? _inPlaceSite;
     private IComObject<IOleInPlaceSiteEx>? _inPlaceSiteEx;
@@ -39,8 +40,7 @@ public abstract partial class BaseControl : BaseDispatch,
     private IComObject<IObjectWithSite>? _site;
     private IComObject<IAdviseSink>? _adviseSink;
     private Window? _window;
-    private SIZE _extentHimetric;
-    private int _freezeCount;
+    private bool _changingExtent;
 
     public event EventHandler<ValueEventArgs<DISPID>>? AmbientPropertyChanged;
 
@@ -49,8 +49,10 @@ public abstract partial class BaseControl : BaseDispatch,
         TracingUtilities.Trace($"Created {GetType().FullName} ({GetType().GUID:B})");
         CurrentSafetyOptions = SupportedSafetyOptions;
         Functions.CreateOleAdviseHolder(out var obj).ThrowOnError();
-        _extentHimetric = GetOriginalExtent();
+        HiMetricExtent = GetOriginalExtent();
         _adviseHolder = new ComObject<IOleAdviseHolder>(obj);
+        Functions.CreateDataAdviseHolder(out var dah).ThrowOnError();
+        _dataAdviseHolder = new ComObject<IDataAdviseHolder>(dah);
         _connectionPoint = new PropertyNotifySinkConnectionPoint();
         AddConnectionPoint(_connectionPoint);
 
@@ -59,24 +61,37 @@ public abstract partial class BaseControl : BaseDispatch,
     }
 
     protected abstract Window CreateWindow(HWND parentHandle, RECT rect);
+    protected override HWND GetWindowHandle() => _window?.Handle ?? HWND.Null;
+    protected IComObject<IOleAdviseHolder>? AdviseHolder => _adviseHolder;
+    protected IComObject<IDataAdviseHolder>? DataAdviseHolder => _dataAdviseHolder;
+    protected IComObject<IOleClientSite>? ClientSite => _clientSite;
+    protected IComObject<IOleInPlaceSite>? InPlaceSite => _inPlaceSite;
+    protected IComObject<IOleInPlaceSiteEx>? InPlaceSiteEx => _inPlaceSiteEx;
+    protected IComObject<IOleInPlaceSiteWindowless>? InPlaceSiteWindowless => _inPlaceSiteWindowless;
+    protected IComObject<IObjectWithSite>? Site => _site;
+    protected IComObject<IAdviseSink>? AdviseSink => _adviseSink;
+
     protected virtual POINTERINACTIVE PointerActivationPolicy => POINTERINACTIVE.POINTERINACTIVE_ACTIVATEONENTRY;
     protected virtual OLEMISC MiscStatus => OLEMISC.OLEMISC_RECOMPOSEONRESIZE | OLEMISC.OLEMISC_CANTLINKINSIDE | OLEMISC.OLEMISC_INSIDEOUT | OLEMISC.OLEMISC_ACTIVATEWHENVISIBLE | OLEMISC.OLEMISC_SETCLIENTSITEFIRST;
     protected virtual VIEWSTATUS ViewStatus => VIEWSTATUS.VIEWSTATUS_OPAQUE | VIEWSTATUS.VIEWSTATUS_SOLIDBKGND;
     protected virtual uint SupportedSafetyOptions => Constants.INTERFACESAFE_FOR_UNTRUSTED_CALLER | Constants.INTERFACESAFE_FOR_UNTRUSTED_DATA;
     protected virtual uint CurrentSafetyOptions { get; set; }
     protected virtual Window? Window => _window;
-    protected virtual SIZE? NaturalExtent => null; // in HiMetric
-    protected override HWND GetWindowHandle() => _window?.Handle ?? HWND.Null;
+    protected virtual SIZE? HiMetricNaturalExtent => null;
     protected virtual ControlState State { get; private set; }
     protected virtual bool IsDirty { get; set; }
-    protected bool InUserMode => GetAmbientProperty(DISPID.DISPID_AMBIENT_USERMODE, false);
-    protected bool InDesignMode => !InUserMode;
+    protected virtual int FreezeCount { get; set; }
+    protected virtual SIZE HiMetricExtent { get; set; }
     protected virtual bool SupportsAggregation => true;
     protected virtual nint AggregationWrapper { get; set; }
-    protected virtual CTRLINFO KeyboardBehavior { get; set; } // CTRLINFO.CTRLINFO_EATS_RETURN | CTRLINFO.CTRLINFO_EATS_ESCAPE;
+    protected virtual CTRLINFO KeyboardBehavior { get; set; } // CTRLINFO.CTRLINFO_EATS_RETURN | CTRLINFO.CTRLINFO_EATS_ESCAPE; call OnControlInfoChanged when changed
     protected virtual IReadOnlyList<OleVerb> Verbs { get; set; } = [];
-    protected virtual AcceleratorTable? KeyboardAccelerators { get; set; }
+    protected virtual AcceleratorTable? KeyboardAccelerators { get; set; } // call OnControlInfoChanged when changed
     protected virtual IReadOnlyList<Type> AggregableInterfaces { get; }
+
+    protected bool InUserMode => GetAmbientProperty(DISPID.DISPID_AMBIENT_USERMODE, false);
+    protected bool InDesignMode => !InUserMode;
+
     bool IAggregable.SupportsAggregation => SupportsAggregation;
     IReadOnlyList<Type> IAggregable.AggregableInterfaces => AggregableInterfaces;
     nint IAggregable.Wrapper { get => AggregationWrapper; set => AggregationWrapper = value; }
@@ -203,7 +218,28 @@ public abstract partial class BaseControl : BaseDispatch,
         return Constants.S_OK;
     }
 
-    protected virtual void SendViewChanged()
+    protected virtual void SendOnDataChanged(ADVF advf = 0)
+    {
+        _dataAdviseHolder?.Object.SendOnDataChange(this, 0, (uint)advf);
+    }
+
+    protected virtual void OnControlInfoChanged()
+    {
+        using var container = _clientSite.As<IOleControlSite>();
+        container?.Object.OnControlInfoChanged();
+    }
+
+    protected virtual void SendOnClose()
+    {
+        _adviseHolder?.Object.SendOnClose();
+    }
+
+    protected virtual void SendOnSave()
+    {
+        _adviseHolder?.Object.SendOnSave();
+    }
+
+    protected virtual void SendOnViewChange()
     {
         _adviseSink?.Object.OnViewChange((uint)DVASPECT.DVASPECT_CONTENT, -1);
     }
@@ -220,12 +256,13 @@ public abstract partial class BaseControl : BaseDispatch,
             DisposeWindow();
         }
 
-        //_adviseSink?.Object.OnClose();
+        SendOnClose();
 
         if ((option == OLECLOSE.OLECLOSE_SAVEIFDIRTY || option == OLECLOSE.OLECLOSE_PROMPTSAVE) && IsDirty)
         {
             _clientSite?.Object.SaveObject();
-            _adviseHolder?.Object.SendOnSave();
+            SendOnSave();
+            SendOnDataChanged();
         }
 
         ChangeState(ControlState.Loaded);
@@ -394,7 +431,8 @@ public abstract partial class BaseControl : BaseDispatch,
     protected virtual void OnWindowResized(object? sender, ValueEventArgs<(WindowResizedType ResizedType, SIZE Size)> e)
     {
         TracingUtilities.Trace($"sender: {sender} type: {e.Value.ResizedType} size: {e.Value.Size}");
-        SendViewChanged();
+        SendOnViewChange();
+        SendOnDataChanged();
     }
 
     protected virtual void OnWindowFocusChanged(object? sender, ValueEventArgs<bool> e)
@@ -477,6 +515,7 @@ public abstract partial class BaseControl : BaseDispatch,
         if (disposing)
         {
             Interlocked.Exchange(ref _adviseHolder, null)?.Dispose();
+            Interlocked.Exchange(ref _dataAdviseHolder, null)?.Dispose();
             Interlocked.Exchange(ref _clientSite, null)?.Dispose();
             Interlocked.Exchange(ref _inPlaceSite, null)?.Dispose();
             Interlocked.Exchange(ref _inPlaceSiteEx, null)?.Dispose();
@@ -629,7 +668,6 @@ public abstract partial class BaseControl : BaseDispatch,
             OLEIVERB.OLEIVERB_DISCARDUNDOSTATE => DiscardUndoState(hwndParent, pos),
             _ => Constants.E_NOTIMPL,
         };
-        TracingUtilities.Trace($"hr: {hr}");
         return hr;
     });
 
@@ -687,10 +725,26 @@ public abstract partial class BaseControl : BaseDispatch,
             if (dwDrawAspect != DVASPECT.DVASPECT_CONTENT)
                 return Constants.DV_E_DVASPECT;
 
-            _extentHimetric = size;
-            var rc = new RECT(0, 0, _extentHimetric.cx.HiMetricToPixel(dpi), _extentHimetric.cy.HiMetricToPixel(dpi));
-            SetWindowPos(rc);
-            _inPlaceSite?.Object.OnPosRectChange(rc);
+            if (_changingExtent)
+                return Constants.S_OK;
+
+            _changingExtent = true;
+            try
+            {
+                HiMetricExtent = size;
+                var rc = new RECT(0, 0, HiMetricExtent.cx.HiMetricToPixel(dpi), HiMetricExtent.cy.HiMetricToPixel(dpi));
+                SetWindowPos(rc);
+                SendOnViewChange();
+
+                IsDirty = true;
+
+                // needed or not?
+                //_inPlaceSite?.Object.OnPosRectChange(rc);
+            }
+            finally
+            {
+                _changingExtent = false;
+            }
             return Constants.S_OK;
         });
     }
@@ -704,7 +758,7 @@ public abstract partial class BaseControl : BaseDispatch,
             if (dwDrawAspect != DVASPECT.DVASPECT_CONTENT)
                 return Constants.DV_E_DVASPECT;
 
-            size = _extentHimetric;
+            size = HiMetricExtent;
             TracingUtilities.Trace($"psizel: {size} pixels: {size.HiMetricToPixel(GetDpi())}");
             return Constants.S_OK;
         });
@@ -801,11 +855,11 @@ public abstract partial class BaseControl : BaseDispatch,
         return hr;
     }
 
-    HRESULT IPersistStreamInit.IsDirty() => TracingUtilities.WrapErrors(() =>
+    HRESULT IPersistStreamInit.IsDirty()
     {
         TracingUtilities.Trace($"IsDirty: {IsDirty}");
         return IsDirty ? Constants.S_OK : Constants.S_FALSE;
-    });
+    }
 
     HRESULT IPersistStreamInit.Load(IStream pStm) => TracingUtilities.WrapErrors(() =>
     {
@@ -822,8 +876,7 @@ public abstract partial class BaseControl : BaseDispatch,
         TracingUtilities.Trace($"pStm {pStm} fClearDirty: {fClearDirty} hr: {hr}");
         if (hr.IsSuccess)
         {
-            _adviseSink?.Object.OnSave();
-            _adviseHolder?.Object.SendOnSave();
+            SendOnSave();
         }
         return hr;
     });
@@ -856,8 +909,8 @@ public abstract partial class BaseControl : BaseDispatch,
             if (dwDrawAspect != DVASPECT.DVASPECT_CONTENT)
                 return Constants.DV_E_DVASPECT;
 
-            size = _extentHimetric;
-            TracingUtilities.Trace($"dwDrawAspect: {dwDrawAspect} lindex: {lindex} ptd: {ptd} size: {_extentHimetric}");
+            size = HiMetricExtent;
+            TracingUtilities.Trace($"dwDrawAspect: {dwDrawAspect} lindex: {lindex} ptd: {ptd} size: {HiMetricExtent}");
             return Constants.S_OK;
         });
         lpsizel = size;
@@ -887,10 +940,7 @@ public abstract partial class BaseControl : BaseDispatch,
         {
             var rcBounds = *(RECT*)lprcBounds;
             Draw(hdcDraw, rcBounds);
-
-            TracingUtilities.Trace($"window rcBounds: {rcBounds}");
-            SetWindowPos(rcBounds);
-            _inPlaceSite?.Object.OnPosRectChange(rcBounds);
+            SendOnViewChange();
         }
         return Constants.S_OK;
     });
@@ -972,7 +1022,7 @@ public abstract partial class BaseControl : BaseDispatch,
         var mode = (DVEXTENTMODE)extentInfo.dwExtentMode;
         TracingUtilities.Trace($"extentInfo sizelProposed: {extentInfo.sizelProposed} mode: {mode}");
 
-        var natural = NaturalExtent;
+        var natural = HiMetricNaturalExtent;
         if (natural == null)
             return Constants.E_NOTIMPL;
 
@@ -1023,14 +1073,14 @@ public abstract partial class BaseControl : BaseDispatch,
     {
         if (bFreeze)
         {
-            _freezeCount++;
+            FreezeCount++;
         }
-        else if (_freezeCount > 0)
+        else if (FreezeCount > 0)
         {
-            _freezeCount--;
+            FreezeCount--;
         }
 
-        TracingUtilities.Trace($"bFreeze: {bFreeze} count:{_freezeCount}");
+        TracingUtilities.Trace($"bFreeze: {bFreeze} count:{FreezeCount}");
         return Constants.S_OK;
     });
 
@@ -1108,15 +1158,133 @@ public abstract partial class BaseControl : BaseDispatch,
         return hr;
     }
 
-    //HRESULT IDataObject.GetData(in FORMATETC pformatetcIn, out STGMEDIUM pmedium) { pmedium = new(); return NotImplemented(); }
-    //HRESULT IDataObject.GetDataHere(in FORMATETC pformatetc, ref STGMEDIUM pmedium) => NotImplemented();
-    //HRESULT IDataObject.QueryGetData(in FORMATETC pformatetc) => NotImplemented();
-    //HRESULT IDataObject.GetCanonicalFormatEtc(in FORMATETC pformatectIn, out FORMATETC pformatetcOut) { pformatetcOut = new(); return NotImplemented(); }
-    //HRESULT IDataObject.SetData(in FORMATETC pformatetc, in STGMEDIUM pmedium, BOOL fRelease) => NotImplemented();
-    //HRESULT IDataObject.EnumFormatEtc(uint dwDirection, out IEnumFORMATETC ppenumFormatEtc) { ppenumFormatEtc = null!; return NotImplemented(); }
-    //HRESULT IDataObject.DAdvise(in FORMATETC pformatetc, uint advf, IAdviseSink pAdvSink, out uint pdwConnection) { pdwConnection = 0; return NotImplemented(); }
-    //HRESULT IDataObject.DUnadvise(uint dwConnection) => NotImplemented();
-    //HRESULT IDataObject.EnumDAdvise(out IEnumSTATDATA ppenumAdvise) { ppenumAdvise = null!; return NotImplemented(); }
+    HRESULT IDataObject.GetDataHere(in FORMATETC pformatetc, ref STGMEDIUM pmedium) => NotImplemented();
+    HRESULT IDataObject.GetCanonicalFormatEtc(in FORMATETC pformatectIn, out FORMATETC pformatetcOut) { pformatetcOut = new(); return NotImplemented(); }
+    HRESULT IDataObject.SetData(in FORMATETC pformatetc, in STGMEDIUM pmedium, BOOL fRelease) => NotImplemented();
+    HRESULT IDataObject.EnumFormatEtc(uint dwDirection, out IEnumFORMATETC ppenumFormatEtc) { ppenumFormatEtc = null!; return NotImplemented(); }
+
+    HRESULT IDataObject.QueryGetData(in FORMATETC pformatetc)
+    {
+        var tymed = (TYMED)pformatetc.tymed;
+        TracingUtilities.Trace($"tymed: {tymed} format: {pformatetc.cfFormat} ('{Clipboard.GetFormatName(pformatetc.cfFormat)}') aspect: {(DVASPECT)pformatetc.dwAspect}");
+        if (tymed.HasFlag(TYMED.TYMED_MFPICT) || tymed.HasFlag(TYMED.TYMED_ENHMF))
+            return Constants.S_OK;
+
+        return Constants.DV_E_TYMED;
+    }
+
+    protected virtual unsafe HRESULT DrawMetaFile(TYMED tymed, ref STGMEDIUM medium, Action<HDC> draw)
+    {
+        ArgumentNullException.ThrowIfNull(draw);
+        if (tymed.HasFlag(TYMED.TYMED_MFPICT))
+        {
+            var hdc = Functions.CreateMetaFileW(PWSTR.Null);
+            if (hdc == 0)
+                return Constants.E_UNEXPECTED;
+
+            draw(hdc);
+
+            var hMF = Functions.CloseMetaFile(hdc);
+            if (hdc == 0)
+            {
+                Functions.DeleteMetaFile(hMF);
+                return Constants.E_UNEXPECTED;
+            }
+
+            var size = sizeof(METAFILEPICT);
+            var pict = (METAFILEPICT*)Marshal.AllocHGlobal(size);
+            Unsafe.InitBlockUnaligned(pict, 0, (uint)size);
+
+            // For MM_ANISOTROPIC pictures, xExt and yExt can be zero when no suggested size is supplied.
+            pict->hMF = hMF;
+            pict->mm = (int)HDC_MAP_MODE.MM_ANISOTROPIC;
+
+            medium.tymed = (uint)TYMED.TYMED_MFPICT;
+            medium.u.hGlobal = (nint)pict;
+            return Constants.S_OK;
+        }
+
+        if (tymed.HasFlag(TYMED.TYMED_ENHMF))
+        {
+            var hdc = Functions.CreateEnhMetaFileW(HDC.Null, PWSTR.Null, 0, PWSTR.Null);
+            if (hdc == 0)
+                return Constants.E_UNEXPECTED;
+
+            draw(hdc);
+
+            var hMF = Functions.CloseEnhMetaFile(hdc);
+            if (hdc == 0)
+            {
+                Functions.DeleteEnhMetaFile(hMF);
+                return Constants.E_UNEXPECTED;
+            }
+
+            medium.tymed = (uint)TYMED.TYMED_ENHMF;
+            medium.u.hEnhMetaFile = hMF;
+            return Constants.S_OK;
+        }
+        throw new NotSupportedException();
+    }
+
+    // this supports Word preview for example
+    unsafe HRESULT IDataObject.GetData(in FORMATETC pformatetcIn, out STGMEDIUM pmedium)
+    {
+        var medium = new STGMEDIUM();
+        var format = pformatetcIn;
+        var tymed = (TYMED)pformatetcIn.tymed;
+        var hr = TracingUtilities.WrapErrors(() =>
+        {
+            TracingUtilities.Trace($"tymed: {tymed} format: {format.cfFormat} ('{Clipboard.GetFormatName(format.cfFormat)}') aspect: {(DVASPECT)format.dwAspect}");
+            if (format.dwAspect != (uint)DVASPECT.DVASPECT_CONTENT)
+                return Constants.DV_E_DVASPECT;
+
+            if (tymed.HasFlag(TYMED.TYMED_MFPICT) || tymed.HasFlag(TYMED.TYMED_ENHMF))
+                return DrawMetaFile(tymed, ref medium, hdc =>
+                {
+                    var dpi = GetDpi();
+                    var rc = new RECT(0, 0, HiMetricExtent.cx.HiMetricToPixel(dpi), HiMetricExtent.cy.HiMetricToPixel(dpi));
+                    TracingUtilities.Trace($"hdc: {hdc} dpi: {dpi} rc: {rc}");
+                    _ = Functions.SaveDC(hdc);
+                    Functions.SetWindowOrgEx(hdc, 0, 0, 0);
+                    Functions.SetWindowExtEx(hdc, rc.Width, rc.Height, 0);
+                    Draw(hdc, rc);
+                    Functions.RestoreDC(hdc, -1);
+                    SendOnViewChange();
+                });
+
+            return Constants.DV_E_FORMATETC;
+        });
+        pmedium = medium;
+        return hr;
+    }
+
+    HRESULT IDataObject.DAdvise(in FORMATETC pformatetc, uint advf, IAdviseSink pAdvSink, out uint pdwConnection)
+    {
+        pdwConnection = 0;
+        var hr = _dataAdviseHolder?.Object.Advise(this, pformatetc, advf, pAdvSink, out pdwConnection);
+        TracingUtilities.Trace($"pformatetc: {pformatetc} advf: {(ADVF)advf} pAdvSink: {pAdvSink} connection: {pdwConnection}");
+        return hr ?? Constants.E_NOTIMPL;
+    }
+
+    HRESULT IDataObject.DUnadvise(uint dwConnection)
+    {
+        var hr = _dataAdviseHolder?.Object.Unadvise(dwConnection);
+        TracingUtilities.Trace($"dwConnection: {dwConnection}");
+        return hr ?? Constants.E_NOTIMPL;
+    }
+
+    HRESULT IDataObject.EnumDAdvise(out IEnumSTATDATA ppenumAdvise)
+    {
+        IEnumSTATDATA? enumAdvise = null;
+        var hr = TracingUtilities.WrapErrors(() =>
+        {
+            var hr = _dataAdviseHolder?.Object.EnumAdvise(out enumAdvise) ?? Constants.E_NOTIMPL;
+            TracingUtilities.Trace($"ppenumAdvise {enumAdvise}: {hr}");
+            return hr;
+        });
+        ppenumAdvise = enumAdvise!;
+        return hr;
+    }
 
     HRESULT IObjectWithSite.SetSite(nint pUnkSite) => TracingUtilities.WrapErrors(() =>
     {
@@ -1194,14 +1362,14 @@ public abstract partial class BaseControl : BaseDispatch,
             TracingUtilities.Trace($"lprcPosRect: {pos} lprcClipRect: {clip} window: {window}");
             if (window != null)
             {
-                var tempRgn = new HRGN();
-                if (Functions.IntersectRect(out var rc, pos, clip) && !Functions.EqualRect(rc, pos))
-                {
-                    Functions.OffsetRect(ref rc, -pos.left, -pos.top);
-                    tempRgn = Functions.CreateRectRgnIndirect(rc);
-                }
+                //var tempRgn = new HRGN();
+                //if (Functions.IntersectRect(out var rc, pos, clip) && !Functions.EqualRect(rc, pos))
+                //{
+                //    Functions.OffsetRect(ref rc, -pos.left, -pos.top);
+                //    tempRgn = Functions.CreateRectRgnIndirect(rc);
+                //}
 
-                _ = Functions.SetWindowRgn(window.Handle, tempRgn, true);
+                //_ = Functions.SetWindowRgn(window.Handle, tempRgn, true);
                 SetWindowPos(pos);
             }
             return Constants.S_OK;
@@ -1303,8 +1471,8 @@ public abstract partial class BaseControl : BaseDispatch,
         var size = pSizel;
         return TracingUtilities.WrapErrors(() =>
         {
-            _extentHimetric = size;
-            TracingUtilities.Trace($"pSizel: {size} pixels: {_extentHimetric.HiMetricToPixel(GetDpi())}");
+            HiMetricExtent = size;
+            TracingUtilities.Trace($"pSizel: {size} pixels: {HiMetricExtent.HiMetricToPixel(GetDpi())}");
             return ((IOleObject)this).SetExtent(DVASPECT.DVASPECT_CONTENT, size);
         });
     }
@@ -1314,7 +1482,7 @@ public abstract partial class BaseControl : BaseDispatch,
         var size = new SIZE();
         var hr = TracingUtilities.WrapErrors(() =>
         {
-            size = _extentHimetric;
+            size = HiMetricExtent;
             TracingUtilities.Trace($"pSizel: {size} pixels: {size.HiMetricToPixel(GetDpi())}");
             return Constants.S_OK;
         });
@@ -1392,8 +1560,9 @@ public abstract partial class BaseControl : BaseDispatch,
     HRESULT IRunnableObject.GetRunningClass(out Guid lpClsid)
     {
         TracingUtilities.Trace();
-        lpClsid = GetType().GUID;
-        return Constants.S_OK;
+        //lpClsid = GetType().GUID;
+        lpClsid = Guid.Empty;
+        return Constants.E_UNEXPECTED;
     }
 
     HRESULT IRunnableObject.Run(IBindCtx pbc)

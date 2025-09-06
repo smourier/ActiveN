@@ -3,11 +3,11 @@
 public class HelloWorldWindow(HWND parentHandle, WINDOW_STYLE style, RECT rect)
     : Window(title: nameof(HelloWorldWindow), parentHandle: parentHandle, style: style, rect: rect)
 {
-    protected override bool OnPaint(HDC hdc, PAINTSTRUCT ps)
+    protected override bool OnPaint(HDC hdc, PAINTSTRUCT ps) { Paint(hdc, ClientRect); return true; }
+    internal static void Paint(HDC hdc, RECT rc)
     {
-        TracingUtilities.Trace($"hdc: {hdc} erase: {ps.fErase} restore: {ps.fRestore} incUpdate: {ps.fIncUpdate} rcPaint: {ps.rcPaint}");
-        var text = $"Hello from ActiveN .NET {Environment.Version}!";
-        _ = Functions.TextOutW(hdc, 10, 10, PWSTR.From(text), text.Length);
-        return true;
+        TracingUtilities.Trace($"Paint hdc: {hdc}");
+        var text = $"Hello from ActiveN .NET {Environment.Version} ({DateTime.Now})";
+        _ = Functions.TextOutW(hdc, (rc.left + rc.right) / 2, (rc.top + rc.bottom) / 2, PWSTR.From(text), text.Length);
     }
 }
