@@ -125,14 +125,85 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface
         return Constants.S_OK;
     }
 
+    protected virtual void SetResult(object? value, nint pVarResult)
+    {
+        if (pVarResult == 0)
+            return;
+
+        TracingUtilities.Trace($"SetResult value: {value} type: {value?.GetType().FullName}");
+        if (value is Variant v)
+        {
+            v.DetachTo(pVarResult);
+            return;
+        }
+
+        if (value is VARIANT variant)
+        {
+            unsafe
+            {
+                *(VARIANT*)pVarResult = variant;
+            }
+            return;
+        }
+
+        if (value != null)
+        {
+            var type = value.GetType();
+            if (type.IsClass)
+            {
+                // if it's a com object, we need to pass the wrapper
+                var details = StrategyBasedComWrappers.DefaultIUnknownInterfaceDetailsStrategy.GetComExposedTypeDetails(type.TypeHandle);
+                if (details != null)
+                {
+                    // favor IDispatch for late-bound clients
+                    var unk = DirectN.Extensions.Com.ComObject.GetOrCreateComInstance<IDispatch>(value);
+                    VARENUM varType;
+                    if (unk != 0)
+                    {
+                        varType = VARENUM.VT_DISPATCH;
+                    }
+                    else
+                    {
+                        unk = DirectN.Extensions.Com.ComObject.GetOrCreateComInstance(value, throwOnError: true);
+                        varType = VARENUM.VT_UNKNOWN;
+                    }
+
+                    TracingUtilities.Trace($"returning COM object {value} as {(varType == VARENUM.VT_DISPATCH ? "IDispatch" : "IUnknown")}");
+                    using var vunk = new Variant(unk, varType);
+                    vunk.DetachTo(pVarResult);
+                    return;
+                }
+            }
+        }
+
+        using var va = new Variant(value);
+        va.DetachTo(pVarResult);
+    }
+
+    // we generally don't support out arguments in IDispatch Invoke, except for IDL methods equipped with [out, retval)
+    // so in .NET that return nothing or an HRESULT equivalent and that has a last parameter marked as out
+    private static bool IsOutRetval(MethodInfo method)
+    {
+        if (method.ReturnType != typeof(void) &&
+            method.ReturnType != typeof(uint) &&
+            method.ReturnType != typeof(int) &&
+            method.ReturnType != typeof(HRESULT))
+            return false;
+
+        var parameters = method.GetParameters();
+        return parameters.Length > 0 && parameters[^1].Attributes.HasFlag(ParameterAttributes.Out);
+    }
+
     protected virtual unsafe HRESULT Invoke(int dispIdMember, in Guid riid, uint lcid, DISPATCH_FLAGS wFlags, in DISPPARAMS pDispParams, nint pVarResult, nint pExcepInfo, nint puArgErr)
     {
         try
         {
             TracingUtilities.Trace($"dispIdMember: {dispIdMember} (0x{dispIdMember:X8}) wFlags: {wFlags} cArgs: {pDispParams.cArgs} pVarResult: {pVarResult} pExcepInfo: {pExcepInfo} puArgErr: {puArgErr}");
             var dispatchType = GetDispatchType();
+
+            var member = dispatchType.GetMemberInfo(dispIdMember);
             // note we can return DISP_E_MEMBERNOTFOUND for a method/property that exists in the TLB but not in the actual type
-            if (dispatchType.GetMemberInfo(dispIdMember) is not MemberInfo member)
+            if (member == null)
             {
                 TracingUtilities.Trace($"dispIdMember: {dispIdMember} was not found => DISP_E_MEMBERNOTFOUND.");
                 return Constants.DISP_E_MEMBERNOTFOUND;
@@ -145,11 +216,7 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface
                 {
                     var value = property.GetValue(this);
                     TracingUtilities.Trace($"get value: {value}");
-                    if (pVarResult != 0)
-                    {
-                        using var v = new Variant(value);
-                        v.DetachTo(pVarResult);
-                    }
+                    SetResult(value, pVarResult);
                     return Constants.S_OK;
                 }
 
@@ -179,118 +246,110 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface
             {
                 if (wFlags.HasFlag(DISPATCH_FLAGS.DISPATCH_METHOD))
                 {
-                    var arguments = method.GetParameters();
-                    var hasOutRetval = false;
-
-                    if (arguments.Length != pDispParams.cArgs)
+                    var variantsToDispose = new List<Variant>();
+                    try
                     {
-                        // out, reval parameters handling
-                        hasOutRetval = arguments.Length == (pDispParams.cArgs + 1) && arguments[^1].Attributes.HasFlag(ParameterAttributes.Out);
-                        if (!hasOutRetval)
-                        {
-                            TracingUtilities.Trace($"member: {member.Name} expected parameters count {arguments.Length}, provided {pDispParams.cArgs} : => DISP_E_BADPARAMCOUNT.");
-                            return Constants.DISP_E_BADPARAMCOUNT;
-                        }
-                    }
+                        var isOutRevalMethod = IsOutRetval(method);
+                        var lastParameterIsOutRetval = false;
+                        var arguments = method.GetParameters();
 
-                    var outParameters = new Dictionary<int, int>();
-                    var varArgs = (VARIANT*)pDispParams.rgvarg;
-                    var args = new List<object?>();
-                    if (pDispParams.cArgs > 0)
-                    {
-                        for (var i = 0; i < pDispParams.cArgs; i++)
+                        if (arguments.Length != pDispParams.cArgs)
                         {
-                            // note arguments are stored in in reverse order
-                            var index = (int)(pDispParams.cArgs - i - 1);
-                            var varArg = varArgs[index];
-                            if (varArg.Anonymous.Anonymous.vt.HasFlag(VARENUM.VT_BYREF))
+                            // [out, reval] parameters handling
+                            lastParameterIsOutRetval = arguments.Length == (pDispParams.cArgs + 1) && isOutRevalMethod;
+                            if (!lastParameterIsOutRetval)
                             {
-                                // out parameters
-                                args.Add(null);
-                                outParameters.Add(i, index);
-                            }
-                            else
-                            {
-                                var value = Variant.Unwrap(varArg);
-                                args.Add(value);
-                            }
-                        }
-                    }
-
-                    if (hasOutRetval)
-                    {
-                        args.Add(null);
-                    }
-
-                    var array = args.ToArray();
-                    VARENUM? resultType = null;
-                    var result = method.Invoke(this, array);
-                    if (result is Task task)
-                    {
-                        // we need to run message loop, on the UI thread, until the task is completed
-                        const uint WM_COMPLETED = MessageDecoder.WM_APP + 1234;
-                        var windowHandle = GetWindowHandle();
-                        if (windowHandle == HWND.Null)
-                            throw new InvalidOperationException("Cannot invoke async method when there is no window handle");
-
-                        // note this code avoids using reflection on Task<T> to avoid trimming issues with AOT publishing
-                        var completed = false;
-                        var awaiter = task.GetAwaiter();
-                        awaiter.OnCompleted(() =>
-                        {
-                            completed = true;
-                            Functions.PostMessageW(windowHandle, WM_COMPLETED, 0, 0);
-                        });
-
-                        // note if the window enters a modal loop (like moving it using the caption bar),
-                        // the invoke call will not return until the modal loop is exited. Not sure how to avoid this...
-                        while (!completed)
-                        {
-                            RunMessageLoop(msg => msg.message == WM_COMPLETED);
-                        }
-
-                        result = GetTaskResult(task);
-                    }
-                    else if (result is HRESULT hr)
-                    {
-                        hr.ThrowOnError();
-                        result = 0;
-                        resultType = VARENUM.VT_ERROR;
-                    }
-
-                    // fill out parameters the best we can
-                    foreach (var kv in outParameters)
-                    {
-                        var outParamValue = array[kv.Key];
-                        using var v = new Variant(outParamValue);
-                        var final = v;
-
-                        var va = varArgs[kv.Value];
-                        var requiredType = va.Anonymous.Anonymous.vt & ~VARENUM.VT_BYREF;
-                        if (requiredType != v.VarType)
-                        {
-                            // try to convert
-                            var newV = v.ChangeType(requiredType);
-                            if (newV != null)
-                            {
-                                final = newV;
+                                TracingUtilities.Trace($"member: {member.Name} expected parameters count {arguments.Length}, provided {pDispParams.cArgs} : => DISP_E_BADPARAMCOUNT.");
+                                return Constants.DISP_E_BADPARAMCOUNT;
                             }
                         }
 
-                        final.DetachToByRef((nint)(&va));
-                    }
+                        var methodArgs = method.GetParameters();
+                        TracingUtilities.Trace($"methodArgs.Length: {methodArgs.Length} pDispParams.cArgs: {pDispParams.cArgs} isOutRetval: {isOutRevalMethod} lastParameterIsOutRetval: {lastParameterIsOutRetval}");
+                        var varArgs = (VARIANT*)pDispParams.rgvarg;
+                        var args = new List<object?>();
+                        if (pDispParams.cArgs > 0)
+                        {
+                            for (var i = 0; i < pDispParams.cArgs; i++)
+                            {
+                                // note arguments are stored in in reverse order
+                                var index = (int)(pDispParams.cArgs - i - 1);
+                                var varArg = varArgs[index];
 
-                    if (hasOutRetval)
-                    {
-                        result = array[^1]; // out, retval
-                    }
+                                // no need to unwrap variant if the method expects one
+                                if (methodArgs.Length > i && methodArgs[i].ParameterType == typeof(VARIANT))
+                                {
+                                    args.Add(varArg);
+                                    TracingUtilities.Trace($"arg {i}/{pDispParams.cArgs} is VARIANT vt: {varArg.Anonymous.Anonymous.vt}");
+                                }
+                                else if (methodArgs.Length > i && methodArgs[i].ParameterType == typeof(Variant))
+                                {
+                                    var v = new Variant(varArg);
+                                    variantsToDispose.Add(v);
+                                    args.Add(v);
+                                    TracingUtilities.Trace($"arg {i}/{pDispParams.cArgs} is VARIANT vt: {varArg.Anonymous.Anonymous.vt}");
+                                }
+                                else
+                                {
+                                    var value = Variant.Unwrap(varArg);
+                                    args.Add(value);
+                                    TracingUtilities.Trace($"arg {i}/{pDispParams.cArgs} value: {value} type: {value?.GetType().FullName}");
+                                }
+                            }
+                        }
 
-                    if (pVarResult != 0)
-                    {
-                        using var v = new Variant(result, resultType);
-                        v.DetachTo(pVarResult);
+                        if (lastParameterIsOutRetval)
+                        {
+                            args.Add(null);
+                        }
+
+                        var array = args.ToArray();
+                        var result = method.Invoke(this, array);
+                        if (result is Task task)
+                        {
+                            // we need to run message loop, on the UI thread, until the task is completed
+                            const uint WM_COMPLETED = MessageDecoder.WM_APP + 1234;
+                            var windowHandle = GetWindowHandle();
+                            if (windowHandle == HWND.Null)
+                                throw new InvalidOperationException("Cannot invoke async method when there is no window handle");
+
+                            // note this code avoids using reflection on Task<T> to avoid trimming issues with AOT publishing
+                            var completed = false;
+                            var awaiter = task.GetAwaiter();
+                            awaiter.OnCompleted(() =>
+                            {
+                                completed = true;
+                                Functions.PostMessageW(windowHandle, WM_COMPLETED, 0, 0);
+                            });
+
+                            // note if the window enters a modal loop (like moving it using the caption bar),
+                            // the invoke call will not return until the modal loop is exited. Not sure how to avoid this...
+                            while (!completed)
+                            {
+                                RunMessageLoop(msg => msg.message == WM_COMPLETED);
+                            }
+
+                            result = GetTaskResult(task);
+                        }
+
+                        if (lastParameterIsOutRetval)
+                        {
+                            SetResult(array[^1], pVarResult);
+                        }
+
+                        if (result is HRESULT hr)
+                            return hr;
+
+                        SetResult(result, pVarResult);
+                        return Constants.S_OK;
                     }
-                    return Constants.S_OK;
+                    finally
+                    {
+                        foreach (var v in variantsToDispose)
+                        {
+                            v.Dispose();
+                        }
+                    }
                 }
             }
             throw new InvalidOperationException();
@@ -304,6 +363,7 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface
                 {
                     scode = unchecked((int)Constants.E_FAIL),
                     bstrDescription = new Bstr(ex.GetInterestingExceptionMessage()),
+                    bstrSource = new Bstr(GetType().FullName),
                 };
 
                 *(EXCEPINFO*)pExcepInfo = excepInfo;

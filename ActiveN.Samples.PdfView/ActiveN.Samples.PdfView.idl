@@ -12,6 +12,37 @@ library ActiveNSamplesPdfViewLib
 {
 	importlib("stdole2.tlb");
 
+	typedef [public] PdfPageRotationEnum PdfPageRotation;
+	typedef enum { Normal = 0, Rotate90 = 1, Rotate180 = 2, Rotate270 = 3 } PdfPageRotationEnum;
+
+	[
+		object,
+		uuid(22be6c86-8234-4fee-9a4f-e4d251ff9358),
+		dual,
+		nonextensible,
+		pointer_default(unique),
+		helpstring("IPdfViewPage Interface"),
+	]
+	interface IPdfViewPage : IDispatch
+	{
+		[propget]
+		HRESULT Index([out, retval] int* value);
+
+		[propget]
+			HRESULT Width([out, retval] double* value);
+
+		[propget]
+			HRESULT Height([out, retval] double* value);
+
+		[propget]
+			HRESULT PreferredZoom([out, retval] float* value);
+
+		[propget]
+			HRESULT Rotation([out, retval] PdfPageRotation* value);
+
+		HRESULT ExtractTo(VARIANT output);
+	}
+
 	[
 		object,
 		uuid(63b16fe2-2faa-4498-9c3e-023e720f8cae),
@@ -26,33 +57,34 @@ library ActiveNSamplesPdfViewLib
 		[propput, bindable, requestedit, id(DISPID_ENABLED)]
 		HRESULT Enabled([in]VARIANT_BOOL value);
 		[propget, bindable, requestedit, id(DISPID_ENABLED)]
-			HRESULT Enabled([out, retval]VARIANT_BOOL* value);
+			HRESULT Enabled([out, retval] VARIANT_BOOL* value);
 
 		[propput, bindable, requestedit, id(DISPID_BACKCOLOR)]
 			HRESULT BackColor([in]OLE_COLOR clr);
 		[propget, bindable, requestedit, id(DISPID_BACKCOLOR)]
-			HRESULT BackColor([out, retval]OLE_COLOR* pclr);
+			HRESULT BackColor([out, retval] OLE_COLOR* pclr);
 
 		// these are custom properties for our PdfViewControl
 		[propput, bindable, requestedit]
 			HRESULT ShowControls([in]VARIANT_BOOL value);
 		[propget, bindable, requestedit]
-			HRESULT ShowControls([out, retval]VARIANT_BOOL* value);
+			HRESULT ShowControls([out, retval] VARIANT_BOOL* value);
 
 		[propget, bindable, requestedit]
-			HRESULT PageCount([out, retval]long* value);
+			HRESULT PageCount([out, retval] long* value);
 
 		[propget, bindable, requestedit]
-			HRESULT IsPasswordProtected([out, retval]VARIANT_BOOL* value);
+			HRESULT IsPasswordProtected([out, retval] VARIANT_BOOL* value);
 
 		[propget, bindable, requestedit, id(DISPID_CAPTION)]
-			HRESULT FilePath([out, retval]BSTR* value);
+			HRESULT FilePath([out, retval] BSTR* value);
 
 		[propget, bindable, requestedit, id(DISPID_HWND)]
-			HRESULT HWND([out, retval]LONG_PTR* value);
+			HRESULT HWND([out, retval] LONG_PTR* value);
 
 		HRESULT OpenStream(IStream* stream);
 		HRESULT OpenFile(BSTR filePath);
+		HRESULT GetPage(long pageNumber, [out, retval] IPdfViewPage** value);
 		HRESULT CloseFile();
 		HRESULT MovePage(long delta);
 	};

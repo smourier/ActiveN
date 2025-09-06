@@ -1,0 +1,7 @@
+﻿<Project Sdk="Microsoft.Build.NoTargets/3.7.56">
+
+	<PropertyGroup>
+		<TargetFramework>net46</TargetFramework>
+	</PropertyGroup>
+	
+</Project>

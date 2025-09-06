@@ -10,7 +10,7 @@ public class PdfViewWindow : Window
     private Font? _font;
     private PdfWindow? _pdfWindow;
     private PdfDocument? _pdfDocument;
-    private PdfPage? _pdfPage;
+    private PdfPage? _pdfCurrentPage;
     private HWND _previousButton;
     private HWND _nextButton;
     private bool _showControls = true;
@@ -42,8 +42,8 @@ public class PdfViewWindow : Window
         LoadPage(0);
     }
 
-    protected PdfDocument? PdfDocument => _pdfDocument;
-    protected PdfPage? PdfPage => _pdfPage;
+    public PdfDocument? PdfDocument => _pdfDocument;
+    public PdfPage? CurrentPdfPage => _pdfCurrentPage;
     public string? FilePath { get; private set; }
     public bool IsPasswordProtected => _pdfDocument?.IsPasswordProtected ?? false;
     public int PageCount => (int?)_pdfDocument?.PageCount ?? -1;
@@ -93,6 +93,8 @@ public class PdfViewWindow : Window
     public virtual async Task OpenFile(string filePath)
     {
         ArgumentNullException.ThrowIfNull(filePath);
+        filePath = Path.GetFullPath(filePath);
+        TracingUtilities.Trace($"filePath: {filePath}");
         FilePath = null;
         var file = await StorageFile.GetFileFromPathAsync(filePath);
         if (file != null)
@@ -116,7 +118,7 @@ public class PdfViewWindow : Window
         try
         {
             _pdfDocument = document;
-            _pdfPage?.Dispose();
+            _pdfCurrentPage?.Dispose();
 
             // this is not currently handled
             if (_pdfDocument.IsPasswordProtected)
@@ -136,17 +138,33 @@ public class PdfViewWindow : Window
 
     public virtual void MovePage(int delta)
     {
-        if (_pdfPage == null || _pdfDocument == null)
+        if (_pdfCurrentPage == null || _pdfDocument == null)
             return;
 
-        var page = _pdfPage.Index + delta;
+        var page = _pdfCurrentPage.Index + delta;
         if (page < 0 || page >= _pdfDocument.PageCount)
             return;
 
-        if (page == _pdfPage.Index)
+        if (page == _pdfCurrentPage.Index)
             return;
 
         LoadPage((uint)page);
+    }
+
+    public virtual async Task ExtractPage(PdfPage page, string outputFilePath)
+    {
+        ArgumentNullException.ThrowIfNull(page);
+        ArgumentNullException.ThrowIfNull(outputFilePath);
+        using var stream = new FileStream(outputFilePath, FileMode.Create, FileAccess.Write, FileShare.None);
+        await ExtractPage(page, stream);
+    }
+
+    public virtual Task ExtractPage(PdfPage page, Stream outputStream)
+    {
+        ArgumentNullException.ThrowIfNull(page);
+        ArgumentNullException.ThrowIfNull(outputStream);
+
+        return page.RenderToStreamAsync(outputStream.AsRandomAccessStream()).AsTask();
     }
 
     public virtual void CloseFile()
@@ -178,15 +196,15 @@ public class PdfViewWindow : Window
 
     private void LoadPage(uint index)
     {
-        _pdfPage?.Dispose();
-        _pdfPage = _pdfDocument?.GetPage(index);
+        _pdfCurrentPage?.Dispose();
+        _pdfCurrentPage = _pdfDocument?.GetPage(index);
         _pdfWindow?.Invalidate();
         UpdatePdfWindowSize();
-        if (_pdfPage != null)
+        if (_pdfCurrentPage != null)
         {
-            Text = $"{_title} - {FilePath} - Page {_pdfPage.Index + 1} / {_pdfDocument!.PageCount}";
-            Functions.EnableWindow(_previousButton, _pdfPage.Index > 0);
-            Functions.EnableWindow(_nextButton, _pdfPage.Index < _pdfDocument.PageCount - 1);
+            Text = $"{_title} - {FilePath} - Page {_pdfCurrentPage.Index + 1} / {_pdfDocument!.PageCount}";
+            Functions.EnableWindow(_previousButton, _pdfCurrentPage.Index > 0);
+            Functions.EnableWindow(_nextButton, _pdfCurrentPage.Index < _pdfDocument.PageCount - 1);
         }
         else
         {
@@ -260,7 +278,7 @@ public class PdfViewWindow : Window
     {
         TracingUtilities.Trace($"disposing: {disposing}");
         Interlocked.Exchange(ref _pdfWindow, null)?.Dispose();
-        Interlocked.Exchange(ref _pdfPage, null)?.Dispose();
+        Interlocked.Exchange(ref _pdfCurrentPage, null)?.Dispose();
         Interlocked.Exchange(ref _font, null)?.Dispose();
         base.Dispose(disposing);
     }
@@ -306,13 +324,13 @@ public class PdfViewWindow : Window
             using var dc = interop.BeginDraw(null);
             dc.Clear(parent.BackgroundColor);
 
-            if (parent._pdfPage != null && _pdfRendererNative != null)
+            if (parent._pdfCurrentPage != null && _pdfRendererNative != null)
             {
-                var pageUnk = ((IWinRTObject)parent._pdfPage).NativeObject.ThisPtr; // no AddRef needed
+                var pageUnk = ((IWinRTObject)parent._pdfCurrentPage).NativeObject.ThisPtr; // no AddRef needed
 
                 // resize to fit window's height or width
                 var rc = ClientRect;
-                var size = parent._pdfPage.Size;
+                var size = parent._pdfCurrentPage.Size;
 
                 var factor = GetScaleFactor(rc.ToSize(), size);
                 var width = size.Width * factor.Width;

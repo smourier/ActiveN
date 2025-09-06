@@ -8,9 +8,13 @@ public partial class SimpleComObject : BaseDispatch, ISimple, ISimpleDual
 {
 #pragma warning disable CA1822 // Mark members as static; no since we're dealing with COM instance methods & properties
 
-    public string Name { get; set; } = "SimpleComObject";
-    public double Add(double left, double right) => left + right;
+    public string Name { get; set; } = $"My name is SimpleComObject, from .NET {Environment.Version}";
     public double Multiply(double left, double right) => left * right;
+
+    // note although Add is not defined in ISimpleDual (in TLB),
+    // it will still work in a pure IDispatch (GetIdsOfNames/Invoke) call, as BaseDispatch supports dynamic calls
+    // it's another way of saying that you don't need a TLB/IDL to use pure IDispatch calls
+    public double Add(double left, double right) => left + right;
 
 #pragma warning restore CA1822 // Mark members as static
 
@@ -31,6 +35,7 @@ public partial class SimpleComObject : BaseDispatch, ISimple, ISimpleDual
 
     #region IDispatch support
 
+    // note IDispatch is optional, but nice if you want easier support for late binding clients (.NET Framework's 'dynamic', scriping, python, etc.)
     HRESULT IDispatch.GetIDsOfNames(in Guid riid, PWSTR[] rgszNames, uint cNames, uint lcid, int[] rgDispId) =>
         GetIDsOfNames(in riid, rgszNames, cNames, lcid, rgDispId);
 

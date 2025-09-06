@@ -56,6 +56,10 @@ public partial interface IPdfViewControl : IDispatch
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT GetPage(int pageNumber, out IPdfViewPage page);
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
     HRESULT CloseFile();
 
     [PreserveSig]

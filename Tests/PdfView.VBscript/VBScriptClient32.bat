@@ -1,0 +1,1 @@
+%windir%\SysWow64\cscript.exe VBScriptClient.vbs

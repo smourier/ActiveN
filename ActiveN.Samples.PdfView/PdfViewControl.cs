@@ -93,7 +93,7 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
     public string FilePath => Window?.FilePath ?? string.Empty;
     HRESULT IPdfViewControl.get_FilePath(out BSTR value) { value = new BSTR(Marshal.StringToBSTR(FilePath)); return Constants.S_OK; }
 
-    public int PageCount => Window?.PageCount ?? 0;
+    public int PageCount => Window?.PageCount ?? -1;
     HRESULT IPdfViewControl.get_PageCount(out int value) { value = PageCount; return Constants.S_OK; }
 
     public bool IsPasswordProtected => Window?.IsPasswordProtected ?? false;
@@ -113,7 +113,13 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
     public HWND HWND => GetWindowHandle();
     HRESULT IPdfViewControl.get_HWND(out nint value) { value = HWND; return Constants.S_OK; }
 
-    public void OpenFile(string filePath) => Window?.OpenFile(filePath);
+    public void OpenFile(string filePath)
+    {
+        ArgumentNullException.ThrowIfNull(filePath);
+        EnsureWindow(HWND.Null, new RECT(0, 0, 0, 0));
+        Window?.OpenFile(filePath).Wait();
+    }
+
     HRESULT IPdfViewControl.OpenFile(BSTR filePath)
     {
         if (filePath.Value == 0)
@@ -136,6 +142,20 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
         OpenStream(stream);
         return Constants.S_OK;
     }
+
+    public PdfViewPage GetPage(int pageNumber)
+    {
+        var window = Window;
+        if (window == null)
+            throw new Exception("No file was opened.");
+
+        if (window.PdfDocument == null)
+            throw new Exception("No document was opened.");
+
+        return new(this, window.PdfDocument.GetPage((uint)pageNumber));
+    }
+
+    HRESULT IPdfViewControl.GetPage(int pageNumber, out IPdfViewPage page) { page = GetPage(pageNumber); return Constants.S_OK; }
 
     public void CloseFile() => Window?.CloseFile();
     HRESULT IPdfViewControl.CloseFile() { CloseFile(); return Constants.S_OK; }
