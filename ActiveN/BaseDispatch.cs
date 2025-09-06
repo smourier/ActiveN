@@ -10,7 +10,7 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface
     private bool _disposedValue;
 
     protected virtual object? GetTaskResult(Task task) => null;
-    protected abstract HWND GetWindowHandle();
+    protected virtual HWND GetWindowHandle() => HWND.Null;
     protected abstract ComRegistration ComRegistration { get; }
 
     protected virtual int AutoDispidsBase => 0x10000;
@@ -230,6 +230,8 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface
                         // we need to run message loop, on the UI thread, until the task is completed
                         const uint WM_COMPLETED = MessageDecoder.WM_APP + 1234;
                         var windowHandle = GetWindowHandle();
+                        if (windowHandle == HWND.Null)
+                            throw new InvalidOperationException("Cannot invoke async method when there is no window handle");
 
                         // note this code avoids using reflection on Task<T> to avoid trimming issues with AOT publishing
                         var completed = false;

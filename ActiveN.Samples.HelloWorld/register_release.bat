@@ -1,1 +1,0 @@
-regsvr32 ActiveN.Samples.HelloWorld.dll /i:user /n

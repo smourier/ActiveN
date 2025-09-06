@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActiveN.Samples.HelloWorld"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActiveN.Samples.PdfView", "ActiveN.Samples.PdfView\ActiveN.Samples.PdfView.csproj", "{5AC7E975-EC6A-B0A7-FF6C-B065B5FD9B8D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActiveN.Samples.SimpleComObject", "ActiveN.Samples.SimpleComObject\ActiveN.Samples.SimpleComObject.csproj", "{99DFAFC2-A751-4B82-9AAE-FD38E8FFF3C7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM64 = Debug|ARM64
@@ -55,6 +57,18 @@ Global
 		{5AC7E975-EC6A-B0A7-FF6C-B065B5FD9B8D}.Release|x64.Build.0 = Release|x64
 		{5AC7E975-EC6A-B0A7-FF6C-B065B5FD9B8D}.Release|x86.ActiveCfg = Release|x86
 		{5AC7E975-EC6A-B0A7-FF6C-B065B5FD9B8D}.Release|x86.Build.0 = Release|x86
+		{99DFAFC2-A751-4B82-9AAE-FD38E8FFF3C7}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{99DFAFC2-A751-4B82-9AAE-FD38E8FFF3C7}.Debug|ARM64.Build.0 = Debug|ARM64
+		{99DFAFC2-A751-4B82-9AAE-FD38E8FFF3C7}.Debug|x64.ActiveCfg = Debug|x64
+		{99DFAFC2-A751-4B82-9AAE-FD38E8FFF3C7}.Debug|x64.Build.0 = Debug|x64
+		{99DFAFC2-A751-4B82-9AAE-FD38E8FFF3C7}.Debug|x86.ActiveCfg = Debug|x86
+		{99DFAFC2-A751-4B82-9AAE-FD38E8FFF3C7}.Debug|x86.Build.0 = Debug|x86
+		{99DFAFC2-A751-4B82-9AAE-FD38E8FFF3C7}.Release|ARM64.ActiveCfg = Release|ARM64
+		{99DFAFC2-A751-4B82-9AAE-FD38E8FFF3C7}.Release|ARM64.Build.0 = Release|ARM64
+		{99DFAFC2-A751-4B82-9AAE-FD38E8FFF3C7}.Release|x64.ActiveCfg = Release|x64
+		{99DFAFC2-A751-4B82-9AAE-FD38E8FFF3C7}.Release|x64.Build.0 = Release|x64
+		{99DFAFC2-A751-4B82-9AAE-FD38E8FFF3C7}.Release|x86.ActiveCfg = Release|x86
+		{99DFAFC2-A751-4B82-9AAE-FD38E8FFF3C7}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

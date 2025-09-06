@@ -22,7 +22,7 @@
 		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
 
 		<Company>Simon Mourier</Company>
-		<Description>A sample for ActiveN framework (for building ActiveX controls in .NET Core AOT).</Description>
+		<Description>A sample for ActiveN framework (for building COM objects and ActiveX controls in .NET Core AOT).</Description>
 		<Product>ActiveN</Product>
 		<AssemblyTitle>ActiveN.Samples.HelloWorld</AssemblyTitle>
 		<Copyright>Copyright (C) 2024-2025 Simon Mourier. All rights reserved.</Copyright>
@@ -79,21 +79,6 @@
 		<Using Include="System.Runtime.Versioning" />
 		<Using Include="System.Security" />
 		<Using Include="System.Threading.Tasks" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<None Update="register_debug.bat">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="register_release.bat">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="unregister_debug.bat">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="unregister_release.bat">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
 	</ItemGroup>
 
 	<Import Project="..\ActiveN\ComObjects.targets" />

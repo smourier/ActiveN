@@ -27,12 +27,6 @@
       "commandLineArgs": "ActiveN.Samples.PdfView.comthunk.dll /i:user /n ",
       "workingDirectory": "E:\\smo\\GitHub\\ActiveN\\ActiveN.Samples.PdfView\\bin\\x86\\Debug\\net9.0-windows10.0.22621.0",
       "nativeDebugging": false
-    },
-    "Test": {
-      "commandName": "Executable",
-      "executablePath": "E:\\smo\\work\\ConsoleApp33\\WindowsFormsAppNetFx1\\bin\\Debug\\WindowsFormsAppNetFx1.exe",
-      "workingDirectory": "E:\\smo\\work\\ConsoleApp33\\WindowsFormsAppNetFx1\\bin\\Debug",
-      "nativeDebugging": false
     }
   }
 }

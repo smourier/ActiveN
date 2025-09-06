@@ -25,25 +25,29 @@
 		<Company>Simon Mourier</Company>
 		<Description>A sample for ActiveN framework (for building COM objects and ActiveX controls in .NET Core AOT).</Description>
 		<Product>ActiveN</Product>
-		<AssemblyTitle>ActiveN.Samples.PdfView</AssemblyTitle>
+		<AssemblyTitle>ActiveN.Samples.SimpleComObject</AssemblyTitle>
 		<Copyright>Copyright (C) 2024-2025 Simon Mourier. All rights reserved.</Copyright>
 		<FileVersion>1.0.0.0</FileVersion>
 		<InformationalVersion>1.0.0.0</InformationalVersion>
 		<ProductVersion>1.0.0.0</ProductVersion>
 	</PropertyGroup>
 
+	<Import Project="..\ActiveN\ComObjects.targets" />
+
 	<ItemGroup>
-		<None Remove="ActiveN.Samples.PdfView.bmp" />
-		<None Remove="ActiveN.Samples.PdfView.idl" />
-		<None Remove="PdfView.ico" />
+	  <None Remove="ActiveN.Samples.SimpleComObject.idl" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Compile Include="..\ActiveN\GlobalSuppressions.cs" Link="GlobalSuppressions.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Midl Include="ActiveN.Samples.SimpleComObject.idl" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\ActiveN\ActiveN.csproj" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.2.0" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -62,7 +66,7 @@
 		<Copy SourceFiles="@(AotNetComHost)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
 		<Move ContinueOnError="false" SourceFiles="$(OutDir)AotNetComHost.$(Platform).dll" DestinationFiles="$(OutDir)$(AssemblyName).comthunk.dll" />
 	</Target>
-
+	
 	<ItemGroup>
 		<Using Include="ActiveN" />
 		<Using Include="ActiveN.Hosting" />
@@ -71,50 +75,13 @@
 		<Using Include="DirectN.Extensions" />
 		<Using Include="DirectN.Extensions.Com" />
 		<Using Include="DirectN.Extensions.Utilities" />
-		<Using Include="Microsoft.Win32" />
 		<Using Include="System" />
-		<Using Include="System.ComponentModel" />
-		<Using Include="System.Diagnostics" />
 		<Using Include="System.Diagnostics.CodeAnalysis" />
-		<Using Include="System.IO" />
-		<Using Include="System.Linq" />
-		<Using Include="System.Numerics" />
 		<Using Include="System.Reflection" />
 		<Using Include="System.Runtime.CompilerServices" />
 		<Using Include="System.Runtime.InteropServices" />
 		<Using Include="System.Runtime.InteropServices.Marshalling" />
 		<Using Include="System.Runtime.Versioning" />
-		<Using Include="System.Security" />
-		<Using Include="System.Threading" />
-		<Using Include="System.Threading.Tasks" />
-		<Using Include="Windows.Data.Pdf" />
-		<Using Include="Windows.Graphics.DirectX" />
-		<Using Include="Windows.Foundation" />
-		<Using Include="Windows.Storage" />
-		<Using Include="Windows.Storage.Pickers" />
-		<Using Include="Windows.UI" />
-		<Using Include="Windows.UI.Composition" />
-		<Using Include="Windows.UI.Composition.Core" />
-		<Using Include="WinRT" />
-		<Using Include="WinRT.Interop" />
-	</ItemGroup>
-
-	<Import Project="..\ActiveN\ComObjects.targets" />
-
-	<ItemGroup>
-	  <Compile Include="..\ActiveN\GlobalSuppressions.cs" Link="GlobalSuppressions.cs" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <Icon Include="PdfView.ico" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<Midl Include="ActiveN.Samples.PdfView.idl" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <ToolBoxBitmap32 Include="ActiveN.Samples.PdfView.bmp" />
 	</ItemGroup>
 
 </Project>

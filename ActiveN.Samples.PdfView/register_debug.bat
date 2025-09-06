@@ -1,1 +1,0 @@
-regsvr32 ActiveN.Samples.PdfView.comthunk.dll /i:user /n

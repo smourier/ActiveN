@@ -1,0 +1,47 @@
+﻿#include "olectl.h"
+import "oaidl.idl";
+import "ocidl.idl";
+
+// TODO: generate other uuids
+[
+	uuid(45b87c47-e8d9-4979-b397-c9003fbf4f98),
+	version(1.0),
+	helpstring("ActiveN.Samples.SimpleComObject 1.0 Type Library")
+]
+library ActiveNSamplesSimpleComObjectLib
+{
+	importlib("stdole2.tlb");
+
+	[
+		object,
+		uuid(381ca3ad-ae05-4e00-8f80-e39ed374500b),
+		dual,
+		nonextensible,
+		pointer_default(unique),
+		helpstring("ISimpleDual Interface"),
+	]
+	interface ISimpleDual : IDispatch
+	{
+	};
+
+	[
+		object,
+		uuid(b87ad785-2cd4-4e7c-a5c0-82e11e54639c),
+		nonextensible,
+		pointer_default(unique),
+		helpstring("ISimple Interface"),
+	]
+	interface ISimple : IUnknown
+	{
+	};
+
+	[
+		uuid(a2a2d7bf-773d-49ca-bf99-c3d17ab4225b),
+		helpstring("SimpleComObject Class")
+	]
+		coclass SimpleComObject
+	{
+		[default] interface ISimpleDual;
+		interface ISimple;
+	}
+}
