@@ -55,19 +55,19 @@ library ActiveNSamplesPdfViewLib
 	{
 		// these are standard properties for ActiveX controls (declared in olectl.h)
 		[propput, bindable, requestedit, id(DISPID_ENABLED)]
-		HRESULT Enabled([in]VARIANT_BOOL value);
+		HRESULT Enabled([in] VARIANT_BOOL value);
 		[propget, bindable, requestedit, id(DISPID_ENABLED)]
 			HRESULT Enabled([out, retval] VARIANT_BOOL* value);
 
 		[propput, bindable, requestedit, id(DISPID_BACKCOLOR)]
-			HRESULT BackColor([in]OLE_COLOR clr);
+			HRESULT BackColor([in] OLE_COLOR clr);
 		[propget, bindable, requestedit, id(DISPID_BACKCOLOR)]
 			HRESULT BackColor([out, retval] OLE_COLOR* pclr);
 
 		// these are custom properties for our PdfViewControl
-		[propput, bindable, requestedit]
-			HRESULT ShowControls([in]VARIANT_BOOL value);
-		[propget, bindable, requestedit]
+		[propput, bindable, requestedit, helpstring("Show Controls")]
+			HRESULT ShowControls([in] VARIANT_BOOL value);
+		[propget, bindable, requestedit, helpstring("Show Controls")]
 			HRESULT ShowControls([out, retval] VARIANT_BOOL* value);
 
 		[propget, bindable, requestedit]

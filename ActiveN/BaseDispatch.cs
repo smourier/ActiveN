@@ -61,13 +61,6 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface
         }
     }
 
-    // // override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
-    // ~BaseControl()
-    // {
-    //     // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-    //     Dispose(disposing: false);
-    // }
-
     protected virtual DispatchType GetDispatchType()
     {
         var type = GetType();
@@ -93,7 +86,7 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface
         return dispatchType;
     }
 
-    protected virtual HRESULT GetIDsOfNames(in Guid riid, PWSTR[] rgszNames, uint cNames, uint lcid, int[] rgDispId)
+    protected virtual HRESULT GetIDsOfNames(in Guid riid, PWSTR[] rgszNames, uint cNames, uint lcid, int[] rgDispId) => TracingUtilities.WrapErrors(() =>
     {
         if (rgszNames == null || rgszNames.Length == 0 || rgszNames.Length != cNames)
             return Constants.E_INVALIDARG;
@@ -124,7 +117,7 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface
             return Constants.DISP_E_UNKNOWNNAME;
 
         return Constants.S_OK;
-    }
+    });
 
     protected virtual void SetResult(object? value, nint pVarResult)
     {
@@ -376,29 +369,40 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface
 
     protected virtual HRESULT GetTypeInfo(uint iTInfo, uint lcid, out ITypeInfo ppTInfo)
     {
-        TracingUtilities.Trace($"iTInfo {iTInfo}");
-        ppTInfo = null!;
-        var ti = EnsureTypeInfo();
-        if (ti != null)
+        ITypeInfo? ti = null;
+        var hr = TracingUtilities.WrapErrors(() =>
         {
+            TracingUtilities.Trace($"iTInfo {iTInfo}");
             if (iTInfo != 0)
                 return Constants.DISP_E_BADINDEX;
 
-            ppTInfo = ti.Object;
-            return Constants.S_OK;
-        }
-        return Constants.E_NOTIMPL;
+            var tio = EnsureTypeInfo();
+            if (tio != null)
+            {
+                ti = tio.Object;
+                return Constants.S_OK;
+            }
+            return Constants.E_NOTIMPL;
+        });
+        ppTInfo = ti!;
+        return hr;
     }
 
     protected virtual HRESULT GetTypeInfoCount(out uint pctinfo)
     {
-        var ti = EnsureTypeInfo();
-        pctinfo = ti != null ? 1u : 0u;
-        TracingUtilities.Trace($"pctinfo {pctinfo}");
-        return ti != null ? Constants.S_OK : Constants.E_NOTIMPL;
+        var count = 0u;
+        var hr = TracingUtilities.WrapErrors(() =>
+        {
+            var ti = EnsureTypeInfo();
+            count = ti != null ? 1u : 0u;
+            TracingUtilities.Trace($"pctinfo {count}");
+            return ti != null ? Constants.S_OK : Constants.E_NOTIMPL;
+        });
+        pctinfo = count;
+        return hr;
     }
 
-    public static void RunMessageLoop(Func<MSG, bool> exitLoopFunc)
+    protected virtual void RunMessageLoop(Func<MSG, bool> exitLoopFunc)
     {
         ArgumentNullException.ThrowIfNull(exitLoopFunc);
         do

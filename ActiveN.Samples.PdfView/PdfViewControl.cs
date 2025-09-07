@@ -59,7 +59,7 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
         if (hdc == 0)
             return;
 
-        if (Window != null && Window.PageCount > 0)
+        if ((Window != null && Window.PageCount > 0) && InUserMode)
             return; // nothing to do, window will paint itself
 
         // we can get here if we've not been activated yet 
@@ -89,6 +89,9 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
     public bool Enabled { get; set; } = true;
     HRESULT IPdfViewControl.get_Enabled(out VARIANT_BOOL value) { value = Enabled; return Constants.S_OK; }
     HRESULT IPdfViewControl.set_Enabled(VARIANT_BOOL value) { Enabled = value; return Constants.S_OK; }
+
+    [DispId(unchecked((int)DISPID.STDPROPID_XOBJ_NAME))]
+    public string Name { get; set; } = "PdfViewControl";
 
     public string FilePath => Window?.FilePath ?? string.Empty;
     HRESULT IPdfViewControl.get_FilePath(out BSTR value) { value = new BSTR(Marshal.StringToBSTR(FilePath)); return Constants.S_OK; }

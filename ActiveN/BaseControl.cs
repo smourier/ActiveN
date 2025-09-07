@@ -21,6 +21,7 @@ public abstract partial class BaseControl : BaseDispatch,
     IViewObject2,
     IViewObjectEx,
     IPointerInactive,
+    IPerPropertyBrowsing,
     ISupportErrorInfo,
     IConnectionPointContainer,
     ISpecifyPropertyPages,
@@ -72,7 +73,15 @@ public abstract partial class BaseControl : BaseDispatch,
     protected IComObject<IAdviseSink>? AdviseSink => _adviseSink;
 
     protected virtual POINTERINACTIVE PointerActivationPolicy => POINTERINACTIVE.POINTERINACTIVE_ACTIVATEONENTRY;
-    protected virtual OLEMISC MiscStatus => OLEMISC.OLEMISC_RECOMPOSEONRESIZE | OLEMISC.OLEMISC_CANTLINKINSIDE | OLEMISC.OLEMISC_INSIDEOUT | OLEMISC.OLEMISC_ACTIVATEWHENVISIBLE | OLEMISC.OLEMISC_SETCLIENTSITEFIRST;
+    protected virtual OLEMISC MiscStatus =>
+        OLEMISC.OLEMISC_RECOMPOSEONRESIZE |
+        OLEMISC.OLEMISC_CANTLINKINSIDE |
+        OLEMISC.OLEMISC_INSIDEOUT |
+        OLEMISC.OLEMISC_ACTIVATEWHENVISIBLE |
+        OLEMISC.OLEMISC_SETCLIENTSITEFIRST |
+        //OLEMISC.OLEMISC_IGNOREACTIVATEWHENVISIBLE |
+        OLEMISC.OLEMISC_RENDERINGISDEVICEINDEPENDENT;
+
     protected virtual VIEWSTATUS ViewStatus => VIEWSTATUS.VIEWSTATUS_OPAQUE | VIEWSTATUS.VIEWSTATUS_SOLIDBKGND;
     protected virtual uint SupportedSafetyOptions => Constants.INTERFACESAFE_FOR_UNTRUSTED_CALLER | Constants.INTERFACESAFE_FOR_UNTRUSTED_DATA;
     protected virtual uint CurrentSafetyOptions { get; set; }
@@ -220,7 +229,8 @@ public abstract partial class BaseControl : BaseDispatch,
 
     protected virtual void SendOnDataChanged(ADVF advf = 0)
     {
-        _dataAdviseHolder?.Object.SendOnDataChange(this, 0, (uint)advf);
+        IDataObject dataObject = this; // can't use this directly here
+        _dataAdviseHolder?.Object.SendOnDataChange(dataObject, 0, (uint)advf);
     }
 
     protected virtual void OnControlInfoChanged()
@@ -349,10 +359,10 @@ public abstract partial class BaseControl : BaseDispatch,
     {
         var window = EnsureWindow(hwndParent, pos);
         TracingUtilities.Trace($"window: {window}");
+        ChangeState(ControlState.UIActive);
+
         window?.Show();
         ((IOleInPlaceObject)this).SetObjectRects(pos, pos);
-
-        ChangeState(ControlState.UIActive);
         return Constants.S_OK;
     }
 
@@ -360,10 +370,10 @@ public abstract partial class BaseControl : BaseDispatch,
     {
         var window = EnsureWindow(hwndParent, pos);
         TracingUtilities.Trace($"window: {window}");
+        ChangeState(ControlState.InplaceActive);
+
         window?.Show();
         ((IOleInPlaceObject)this).SetObjectRects(pos, pos);
-
-        ChangeState(ControlState.InplaceActive);
         return Constants.S_OK;
     }
 
@@ -462,6 +472,12 @@ public abstract partial class BaseControl : BaseDispatch,
     {
         ppv = 0;
         TracingUtilities.Trace($"iid: {iid.GetName()}");
+
+        if (State != ControlState.InplaceActive && State != ControlState.UIActive && iid == typeof(IOleInPlaceObject).GUID)
+        {
+            TracingUtilities.Trace($"iid: {iid.GetName()} not allowed in inplace or UI active state. Current state: {State}");
+            return CustomQueryInterfaceResult.Failed;
+        }
 
         if (!_aggregableInterfacesIids.Contains(iid))
         {
@@ -849,7 +865,7 @@ public abstract partial class BaseControl : BaseDispatch,
                     return Constants.S_OK;
                 }
             }
-            return Constants.E_NOTIMPL;
+            return Constants.E_INVALIDARG;
         });
         pGUID = guid;
         return hr;
@@ -940,7 +956,6 @@ public abstract partial class BaseControl : BaseDispatch,
         {
             var rcBounds = *(RECT*)lprcBounds;
             Draw(hdcDraw, rcBounds);
-            SendOnViewChange();
         }
         return Constants.S_OK;
     });
@@ -1061,11 +1076,29 @@ public abstract partial class BaseControl : BaseDispatch,
     }
 
     protected virtual void OnAmbientPropertyChanged(object sender, ValueEventArgs<DISPID> e) => AmbientPropertyChanged?.Invoke(this, e);
-    HRESULT IOleControl.OnAmbientPropertyChange(int dispID) => TracingUtilities.WrapErrors(() =>
+    protected virtual void OnAmbientPropertyChanged(DISPID dispId)
     {
-        var dispid = (DISPID)dispID;
+        // https://learn.microsoft.com/en-us/windows/win32/com/standard-properties
+        if (dispId == DISPID.DISPID_AMBIENT_USERMODE && Window != null)
+        {
+            // this is mostly necessary for Word
+            if (InUserMode)
+            {
+                Window.Show();
+            }
+            else
+            {
+                Window.Hide();
+            }
+        }
+        OnAmbientPropertyChanged(this, new(dispId));
+    }
+
+    HRESULT IOleControl.OnAmbientPropertyChange(int dispId) => TracingUtilities.WrapErrors(() =>
+    {
+        var dispid = (DISPID)dispId;
         TracingUtilities.Trace($"dispID: {dispid}");
-        OnAmbientPropertyChanged(this, new(dispid));
+        OnAmbientPropertyChanged(dispid);
         return Constants.S_OK;
     });
 
@@ -1324,7 +1357,7 @@ public abstract partial class BaseControl : BaseDispatch,
         {
             var km = KeyboardUtilities.GetKEYMODIFIERS();
             var hr = container.Object.TranslateAccelerator(msg, km);
-            TracingUtilities.Trace($"km: {km} hr: {hr}");
+            TracingUtilities.Trace($"km: {km} ok: {hr.IsOk}");
             return hr.IsSuccess ? Constants.S_OK : Constants.S_FALSE;
         }
 
@@ -1617,5 +1650,43 @@ public abstract partial class BaseControl : BaseDispatch,
         });
         pbstrName = bstr;
         return hr;
+    }
+
+    HRESULT IPerPropertyBrowsing.GetDisplayString(int dispID, out BSTR pBstr)
+    {
+        var bstr = BSTR.Null;
+        var hr = TracingUtilities.WrapErrors(() =>
+        {
+            var type = GetDispatchType();
+            var member = type.GetMember(dispID);
+            var name = member?.Info?.Name ?? $"DispID_0x{dispID:X}";
+            bstr = new BSTR(Marshal.StringToBSTR(name));
+            TracingUtilities.Trace($"dispId: {dispID} name: '{name}'");
+            return Constants.S_OK;
+        });
+        pBstr = bstr;
+        return hr;
+    }
+
+    HRESULT IPerPropertyBrowsing.MapPropertyToPage(int dispID, out Guid pClsid)
+    {
+        TracingUtilities.Trace($"dispId: {dispID}");
+        pClsid = Guid.Empty;
+        return NotImplemented();
+    }
+
+    HRESULT IPerPropertyBrowsing.GetPredefinedStrings(int dispID, out CALPOLESTR pCaStringsOut, out CADWORD pCaCookiesOut)
+    {
+        TracingUtilities.Trace($"dispId: {dispID}");
+        pCaStringsOut = new CALPOLESTR();
+        pCaCookiesOut = new CADWORD();
+        return NotImplemented();
+    }
+
+    HRESULT IPerPropertyBrowsing.GetPredefinedValue(int dispID, uint dwCookie, out VARIANT pVarOut)
+    {
+        TracingUtilities.Trace($"dispId: {dispID} dwCookie: {dwCookie}");
+        pVarOut = new VARIANT();
+        return NotImplemented();
     }
 }

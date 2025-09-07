@@ -59,7 +59,9 @@ public abstract partial class ComRegistration
     public virtual bool RegisterEmbeddedTypeLib { get; protected set; }
     public virtual bool InstallInHkcu { get; protected set; }
     public virtual bool CanUnload { get; protected set; }
-    public virtual string? ThreadingModel { get; protected set; } // default is "Apartment"
+    // default is "Both" note: not all of the code currently supports full multithreading
+    // also note aggregation doesn't work if server & client threading models are not compatible (MTA vs STA and the reverse)
+    public virtual string? ThreadingModel { get; protected set; }
     public string? ThunkDllPath { get; protected set; }
     public string RegistrationDllPath => ThunkDllPath ?? DllPath;
 
@@ -273,7 +275,7 @@ public abstract partial class ComRegistration
         ArgumentNullException.ThrowIfNull(type);
         ArgumentNullException.ThrowIfNull(assemblyPath);
 
-        threadingModel = threadingModel?.Trim() ?? "Apartment";
+        threadingModel = threadingModel?.Trim() ?? "Both";
         TracingUtilities.Trace($"Registering {type.FullName} from {assemblyPath} with threading model '{threadingModel}'...");
         using var serverKey = EnsureWritableSubKey(root, Path.Combine(ClsidRegistryKey, type.GUID.ToString("B"), "InprocServer32"));
         serverKey.SetValue(null, assemblyPath);
