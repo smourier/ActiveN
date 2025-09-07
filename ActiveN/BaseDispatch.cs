@@ -519,18 +519,18 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
         return category.GetLocalizedName(lcid);
     }
 
-    protected virtual string GetDisplayString(int dispId)
+    protected virtual string? GetDisplayString(int dispId)
     {
         var type = GetDispatchType();
         var member = type.GetMember(dispId);
-        return member?.Info?.Name ?? $"DispID_0x{dispId:X}";
+        return member?.DefaultString;
     }
 
-    protected virtual Guid MapPropertyToPage(int dispId)
+    protected virtual Guid? MapPropertyToPage(int dispId)
     {
         var type = GetDispatchType();
         var member = type.GetMember(dispId);
-        return member?.PropertyPageId ?? DefaultPropertyPageId;
+        return member?.PropertyPageId;
     }
 
     public class PredefinedString(uint id, string name)

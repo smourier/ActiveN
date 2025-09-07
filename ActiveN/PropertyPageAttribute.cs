@@ -14,4 +14,6 @@ public sealed class PropertyPageAttribute(string clsid) : Attribute
             return BaseDispatch.DefaultPropertyPageId;
         }
     }
+
+    public string? DefaultString { get; set; }
 }

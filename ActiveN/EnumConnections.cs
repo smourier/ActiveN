@@ -48,4 +48,33 @@ public partial class EnumConnections(KeyValuePair<uint, IComObject>[] connection
         }
         return (max == count) ? Constants.S_OK : Constants.S_FALSE;
     }
+
+    public static IEnumerable<IComObject> EnumerateConnections(IConnectionPoint cp)
+    {
+        ArgumentNullException.ThrowIfNull(cp);
+
+        if (cp is BaseConnectionPoint bcp)
+        {
+            foreach (var sink in bcp.Sinks)
+            {
+                yield return sink.Value;
+            }
+            yield break;
+        }
+
+        cp.EnumConnections(out var enumConnectionsObj);
+        if (enumConnectionsObj == null)
+            yield break;
+
+        using var ecp = new ComObject<IEnumConnections>(enumConnectionsObj);
+        var cd = new CONNECTDATA[1];
+        while (ecp.Object.Next(1, cd, out var fetched) == Constants.S_OK && fetched == 1)
+        {
+            using var sink = DirectN.Extensions.Com.ComObject.FromPointer<IUnknown>(cd[0].pUnk);
+            if (sink == null)
+                continue;
+
+            yield return sink;
+        }
+    }
 }

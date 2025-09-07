@@ -65,9 +65,9 @@ library ActiveNSamplesPdfViewLib
 			HRESULT BackColor([out, retval] OLE_COLOR* pclr);
 
 		// these are custom properties for our PdfViewControl
-		[propput, bindable, requestedit, helpstring("Show Controls")]
+		[propput, bindable, requestedit]
 			HRESULT ShowControls([in] VARIANT_BOOL value);
-		[propget, bindable, requestedit, helpstring("Show Controls")]
+		[propget, bindable, requestedit]
 			HRESULT ShowControls([out, retval] VARIANT_BOOL* value);
 
 		[propget, bindable, requestedit]

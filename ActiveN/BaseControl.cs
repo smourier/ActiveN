@@ -1,5 +1,4 @@
-﻿
-namespace ActiveN;
+﻿namespace ActiveN;
 
 [GeneratedComClass]
 [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.Interfaces)]
@@ -162,23 +161,17 @@ public abstract partial class BaseControl : BaseDispatch,
         if (cp == null)
             return true;
 
-        cp.EnumConnections(out var enumConnectionsObj);
-        if (enumConnectionsObj == null)
-            return true;
-
-        using var ecp = new ComObject<IEnumConnections>(enumConnectionsObj);
-        var cd = new CONNECTDATA[1];
-        while (ecp.Object.Next(1, cd, out var fetched) == Constants.S_OK && fetched == 1)
+        foreach (var connection in EnumConnections.EnumerateConnections(cp))
         {
-            using var com = DirectN.Extensions.Com.ComObject.FromPointer<IPropertyNotifySink>(cd[0].pUnk);
-            if (com != null)
+            var com = connection.As<IPropertyNotifySink>();
+            if (com == null)
+                continue;
+
+            var hr = com.Object.OnRequestEdit(dispId);
+            if (hr.IsFalse)
             {
-                var hr = com.Object.OnRequestEdit(dispId);
-                if (hr.IsFalse)
-                {
-                    TracingUtilities.Trace($"OnRequestEdit failed: {hr}");
-                    return false;
-                }
+                TracingUtilities.Trace($"OnRequestEdit failed: {hr}");
+                return false;
             }
         }
         return true;
@@ -190,15 +183,9 @@ public abstract partial class BaseControl : BaseDispatch,
         if (cp == null)
             return;
 
-        cp.EnumConnections(out var enumConnectionsObj);
-        if (enumConnectionsObj == null)
-            return;
-
-        using var ecp = new ComObject<IEnumConnections>(enumConnectionsObj);
-        var cd = new CONNECTDATA[1];
-        while (ecp.Object.Next(1, cd, out var fetched) == Constants.S_OK && fetched == 1)
+        foreach (var connection in EnumConnections.EnumerateConnections(cp))
         {
-            using var com = DirectN.Extensions.Com.ComObject.FromPointer<IPropertyNotifySink>(cd[0].pUnk);
+            var com = connection.As<IPropertyNotifySink>();
             com?.Object.OnChanged(dispId);
         }
     }
@@ -298,8 +285,15 @@ public abstract partial class BaseControl : BaseDispatch,
 
     protected virtual void SendOnDataChanged(ADVF advf = 0)
     {
-        IDataObject dataObject = this; // can't use this directly here
-        _dataAdviseHolder?.Object.SendOnDataChange(dataObject, 0, (uint)advf);
+        var dataObjectPtr = DirectN.Extensions.Com.ComObject.GetOrCreateComInstance<IDataObject>(this);
+        if (dataObjectPtr == 0)
+            return;
+
+        using var dataObject = DirectN.Extensions.Com.ComObject.FromPointer<IDataObject>(dataObjectPtr)!;
+        if (dataObject == null)
+            return;
+
+        _dataAdviseHolder?.Object.SendOnDataChange(dataObject.Object, 0, (uint)advf);
     }
 
     protected virtual void OnControlInfoChanged()
@@ -1692,13 +1686,13 @@ public abstract partial class BaseControl : BaseDispatch,
         return hr;
     }
 
-    HRESULT ICategorizeProperties.MapPropertyToCategory(DISPID dispid, out PROPCAT ppropcat)
+    HRESULT ICategorizeProperties.MapPropertyToCategory(DISPID dispId, out PROPCAT ppropcat)
     {
         var propcat = PROPCAT.PROPCAT_Misc;
         var hr = TracingUtilities.WrapErrors(() =>
         {
-            propcat = MapPropertyToCategory((int)dispid);
-            TracingUtilities.Trace($"dispId: {dispid} cat: {propcat}");
+            propcat = MapPropertyToCategory((int)dispId);
+            TracingUtilities.Trace($"dispId: {dispId} (0x:{dispId:X}) cat: {propcat}");
             return Constants.S_OK;
         });
         ppropcat = propcat;
@@ -1725,9 +1719,13 @@ public abstract partial class BaseControl : BaseDispatch,
         var hr = TracingUtilities.WrapErrors(() =>
         {
             var name = GetDisplayString(dispId);
-            bstr = new BSTR(Marshal.StringToBSTR(name));
-            TracingUtilities.Trace($"dispId: {dispId} name: '{name}'");
-            return Constants.S_OK;
+            TracingUtilities.Trace($"dispId: {dispId} (0x:{dispId:X}) name: '{name}'");
+            if (name != null)
+            {
+                bstr = new BSTR(Marshal.StringToBSTR(name));
+                return Constants.S_OK;
+            }
+            return Constants.S_FALSE;
         });
         pBstr = bstr;
         return hr;
@@ -1738,48 +1736,83 @@ public abstract partial class BaseControl : BaseDispatch,
         var clsid = DefaultPropertyPageId;
         var hr = TracingUtilities.WrapErrors(() =>
         {
-            clsid = MapPropertyToPage(dispId);
-            TracingUtilities.Trace($"dispId: {dispId} clsid: {clsid}");
-            return Constants.S_OK;
+            var id = MapPropertyToPage(dispId);
+            TracingUtilities.Trace($"dispId: {dispId} (0x:{dispId:X}) clsid: {id}");
+            if (id != null)
+            {
+                clsid = id.Value;
+                return Constants.S_OK;
+            }
+            return Constants.PERPROP_E_NOPAGEAVAILABLE;
         });
         pClsid = clsid;
         return hr;
     }
 
-    unsafe HRESULT IPerPropertyBrowsing.GetPredefinedStrings(int dispId, out CALPOLESTR pCaStringsOut, out CADWORD pCaCookiesOut)
+    unsafe HRESULT IPerPropertyBrowsing.GetPredefinedStrings(int dispId, nint pCaStringsOut, nint pCaCookiesOut)
     {
-        var str = new CALPOLESTR();
-        var cookies = new CADWORD();
+        var strElemsCount = 0u;
+        var strElems = nint.Zero;
+
+        var cookiesElemsCount = 0u;
+        var cookiesElems = nint.Zero;
         var hr = TracingUtilities.WrapErrors(() =>
         {
+            var hr = Constants.E_UNEXPECTED;
             if (PredefinedStrings.TryGetValue(dispId, out var list) && list.Count > 0)
             {
-                cookies.cElems = (uint)list.Count;
-                cookies.pElems = Marshal.AllocCoTaskMem(sizeof(uint) * list.Count);
-                var cookiesArray = (uint*)cookies.pElems;
-
-                str.cElems = (uint)list.Count;
-                str.pElems = Marshal.AllocCoTaskMem(sizeof(PWSTR) * list.Count);
-                var strArray = (PWSTR*)str.pElems;
-
-                for (var i = 0; i < list.Count; i++)
+                if (pCaStringsOut != 0)
                 {
-                    var predefined = list[i];
-                    cookiesArray[i] = predefined.Id;
-                    strArray[i] = new PWSTR(Marshal.StringToCoTaskMemUni(predefined.Name));
+                    strElemsCount = (uint)list.Count;
+                    strElems = Marshal.AllocCoTaskMem(sizeof(PWSTR) * list.Count);
+                }
+
+                if (pCaCookiesOut != 0)
+                {
+                    cookiesElemsCount = (uint)list.Count;
+                    cookiesElems = Marshal.AllocCoTaskMem(sizeof(uint) * list.Count);
+                }
+
+                if (pCaCookiesOut != 0 || pCaStringsOut != 0)
+                {
+                    var strArray = (PWSTR*)strElems;
+                    var cookiesArray = (uint*)cookiesElems;
+                    for (var i = 0; i < list.Count; i++)
+                    {
+                        var predefined = list[i];
+                        if (cookiesArray != null)
+                        {
+                            cookiesArray[i] = predefined.Id;
+                        }
+
+                        if (strArray != null)
+                        {
+                            strArray[i] = new PWSTR(Marshal.StringToCoTaskMemUni(predefined.Name));
+                        }
+                    }
+                    hr = Constants.S_OK;
                 }
             }
-            TracingUtilities.Trace($"dispId: {dispId} strings: {str.cElems} cookies: {cookies.cElems}");
-            return Constants.S_OK;
+            TracingUtilities.Trace($"dispId: {dispId} (0x:{dispId:X}) strings: {strElemsCount} cookies: {cookiesElemsCount}");
+            return hr;
         });
-        pCaStringsOut = str;
-        pCaCookiesOut = cookies;
+
+        // some containers (Word) seems to send null for pCaStringsOut and/or pCaCookiesOut here...
+        if (pCaStringsOut != 0)
+        {
+            *(CALPOLESTR*)pCaStringsOut = new CALPOLESTR { cElems = strElemsCount, pElems = strElems };
+        }
+
+        if (pCaCookiesOut != 0)
+        {
+            *(CADWORD*)pCaCookiesOut = new CADWORD { cElems = cookiesElemsCount, pElems = cookiesElems };
+        }
         return hr;
     }
 
     HRESULT IPerPropertyBrowsing.GetPredefinedValue(int dispId, uint dwCookie, out VARIANT pVarOut)
     {
-        TracingUtilities.Trace($"dispId: {dispId} dwCookie: {dwCookie}");
+        TracingUtilities.Trace($"dispId: {dispId} (0x:{dispId:X}) dwCookie: {dwCookie}");
         var variant = new VARIANT();
         var hr = TracingUtilities.WrapErrors(() =>
         {

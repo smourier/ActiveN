@@ -36,7 +36,7 @@
 			<TypeLibRc>
 				#include &lt;winres.h&gt;
 				1 TYPELIB %(Midl.FileName).tlb
-				1 DIALOGEX 0, 0, 300, 200
+				1 DIALOGEX 0, 0, 250, 110
 					STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 					CAPTION "$(AssemblyTitle)"
 					FONT 8, "MS Shell Dlg", 0, 0, 0x1

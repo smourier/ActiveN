@@ -100,7 +100,14 @@ public class DispatchType([DynamicallyAccessedMembers(DynamicallyAccessedMemberT
 
                 var category = GetCategory(memberInfo);
                 var member = CreateMember(funcDesc.Value.memid, category, memberInfo) ?? throw new InvalidOperationException();
-                member.PropertyPageId = memberInfo?.GetCustomAttribute<PropertyPageAttribute>()?.Guid ?? BaseDispatch.DefaultPropertyPageId;
+
+                var page = memberInfo?.GetCustomAttribute<PropertyPageAttribute>();
+                if (page != null)
+                {
+                    member.PropertyPageId = page.Guid;
+                    member.DefaultString = page.DefaultString;
+                }
+
                 _membersByName[memberInfo?.Name ?? name] = member;
                 _memberByDispIds[member.DispId] = member;
             }
@@ -134,6 +141,14 @@ public class DispatchType([DynamicallyAccessedMembers(DynamicallyAccessedMemberT
 
             var category = GetCategory(method);
             var member = CreateMember(dispid, category, method) ?? throw new InvalidOperationException();
+
+            var page = method?.GetCustomAttribute<PropertyPageAttribute>();
+            if (page != null)
+            {
+                member.PropertyPageId = page.Guid;
+                member.DefaultString = page.DefaultString;
+            }
+
             member.PropertyPageId = method?.GetCustomAttribute<PropertyPageAttribute>()?.Guid ?? BaseDispatch.DefaultPropertyPageId;
             _membersByName[name] = member;
             _memberByDispIds[member.DispId] = member;
@@ -159,6 +174,14 @@ public class DispatchType([DynamicallyAccessedMembers(DynamicallyAccessedMemberT
 
             var category = GetCategory(property);
             var member = CreateMember(dispid, category, property) ?? throw new InvalidOperationException();
+
+            var page = property?.GetCustomAttribute<PropertyPageAttribute>();
+            if (page != null)
+            {
+                member.PropertyPageId = page.Guid;
+                member.DefaultString = page.DefaultString;
+            }
+
             member.PropertyPageId = property?.GetCustomAttribute<PropertyPageAttribute>()?.Guid ?? BaseDispatch.DefaultPropertyPageId;
             _membersByName[name] = member;
             _memberByDispIds[member.DispId] = member;
