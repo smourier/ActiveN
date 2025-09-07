@@ -100,6 +100,7 @@ public class DispatchType([DynamicallyAccessedMembers(DynamicallyAccessedMemberT
 
                 var category = GetCategory(memberInfo);
                 var member = CreateMember(funcDesc.Value.memid, category, memberInfo) ?? throw new InvalidOperationException();
+                member.PropertyPageId = memberInfo?.GetCustomAttribute<PropertyPageAttribute>()?.Guid ?? BaseDispatch.DefaultPropertyPageId;
                 _membersByName[memberInfo?.Name ?? name] = member;
                 _memberByDispIds[member.DispId] = member;
             }
@@ -133,6 +134,7 @@ public class DispatchType([DynamicallyAccessedMembers(DynamicallyAccessedMemberT
 
             var category = GetCategory(method);
             var member = CreateMember(dispid, category, method) ?? throw new InvalidOperationException();
+            member.PropertyPageId = method?.GetCustomAttribute<PropertyPageAttribute>()?.Guid ?? BaseDispatch.DefaultPropertyPageId;
             _membersByName[name] = member;
             _memberByDispIds[member.DispId] = member;
         }
@@ -157,6 +159,7 @@ public class DispatchType([DynamicallyAccessedMembers(DynamicallyAccessedMemberT
 
             var category = GetCategory(property);
             var member = CreateMember(dispid, category, property) ?? throw new InvalidOperationException();
+            member.PropertyPageId = property?.GetCustomAttribute<PropertyPageAttribute>()?.Guid ?? BaseDispatch.DefaultPropertyPageId;
             _membersByName[name] = member;
             _memberByDispIds[member.DispId] = member;
         }

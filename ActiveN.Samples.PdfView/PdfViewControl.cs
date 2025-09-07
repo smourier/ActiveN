@@ -28,6 +28,12 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
         var IID_IPdfViewControlEvents = new Guid("48c606f1-d597-467d-8a38-1c02fd7e019d"); // this must match the one in the .idl
         _eventsConnectionPoint = new DispatchConnectionPoint(IID_IPdfViewControlEvents);
         AddConnectionPoint(_eventsConnectionPoint);
+        PropertyPagesIds = [
+            DefaultPropertyPageId,
+            Constants.CLSID_StockFontPage,
+            Constants.CLSID_StockColorPage,
+            Constants.CLSID_StockPicturePage
+            ];
     }
 
     #region Mandatory overrides
@@ -86,12 +92,12 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
 
     // COM visible public properties exposed through IPdfView IDL should go here
     // types of properties here must convertible into variants or must implement from IValueGet
-    public bool Enabled { get; set; } = true;
+    public bool Enabled { get => GetStockProperty(true); set => SetStockProperty(value); }
     HRESULT IPdfViewControl.get_Enabled(out VARIANT_BOOL value) { value = Enabled; return Constants.S_OK; }
     HRESULT IPdfViewControl.set_Enabled(VARIANT_BOOL value) { Enabled = value; return Constants.S_OK; }
 
     [DispId(unchecked((int)DISPID.STDPROPID_XOBJ_NAME))]
-    public string Name { get; set; } = "PdfViewControl";
+    public string Name { get => GetStockProperty<string>() ?? "PdfViewControl"; set => SetStockProperty(value); }
 
     public string FilePath => Window?.FilePath ?? string.Empty;
     HRESULT IPdfViewControl.get_FilePath(out BSTR value) { value = new BSTR(Marshal.StringToBSTR(FilePath)); return Constants.S_OK; }
@@ -105,6 +111,7 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
     // category (for host that support a property grid editor like VB/VBA)
     // can match PROPCAT_XXX or be a custom string
     [Category("Appearance")]
+    [PropertyPage(DefaultPropertyPageIdString)]
     public bool ShowControls { get => Window?.ShowControls ?? true; set { if (Window != null) Window.ShowControls = value; } }
     HRESULT IPdfViewControl.get_ShowControls(out VARIANT_BOOL value) { value = ShowControls; return Constants.S_OK; }
     HRESULT IPdfViewControl.set_ShowControls(VARIANT_BOOL value) { ShowControls = value; return Constants.S_OK; }

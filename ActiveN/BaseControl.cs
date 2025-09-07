@@ -1,4 +1,5 @@
-﻿namespace ActiveN;
+﻿
+namespace ActiveN;
 
 [GeneratedComClass]
 [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.Interfaces)]
@@ -132,6 +133,74 @@ public abstract partial class BaseControl : BaseDispatch,
         var size = 192.PixelToHiMetric(dpi);
         TracingUtilities.Trace($"dpi: {dpi} size: {size}");
         return new SIZE(size, size);
+    }
+
+    protected override void OnStockPropertyChanged(int dispId)
+    {
+        TracingUtilities.Trace($"dispId: {dispId} FreezeCount: {FreezeCount}");
+        base.OnStockPropertyChanged(dispId);
+        if (FreezeCount == 0 && !FireOnRequestEdit(dispId))
+        {
+            TracingUtilities.Trace($"OnRequestEdit failed for dispId: {dispId}");
+            return;
+        }
+
+        IsDirty = true;
+
+        if (FreezeCount == 0)
+        {
+            FireOnChanged(dispId);
+        }
+
+        SendOnViewChange();
+        SendOnDataChanged();
+    }
+
+    protected virtual bool FireOnRequestEdit(int dispId)
+    {
+        var cp = _connectionPoints.FirstOrDefault(c => c.Key == typeof(IPropertyNotifySink).GUID).Value;
+        if (cp == null)
+            return true;
+
+        cp.EnumConnections(out var enumConnectionsObj);
+        if (enumConnectionsObj == null)
+            return true;
+
+        using var ecp = new ComObject<IEnumConnections>(enumConnectionsObj);
+        var cd = new CONNECTDATA[1];
+        while (ecp.Object.Next(1, cd, out var fetched) == Constants.S_OK && fetched == 1)
+        {
+            using var com = DirectN.Extensions.Com.ComObject.FromPointer<IPropertyNotifySink>(cd[0].pUnk);
+            if (com != null)
+            {
+                var hr = com.Object.OnRequestEdit(dispId);
+                if (hr.IsFalse)
+                {
+                    TracingUtilities.Trace($"OnRequestEdit failed: {hr}");
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    protected virtual void FireOnChanged(int dispId)
+    {
+        var cp = _connectionPoints.FirstOrDefault(c => c.Key == typeof(IPropertyNotifySink).GUID).Value;
+        if (cp == null)
+            return;
+
+        cp.EnumConnections(out var enumConnectionsObj);
+        if (enumConnectionsObj == null)
+            return;
+
+        using var ecp = new ComObject<IEnumConnections>(enumConnectionsObj);
+        var cd = new CONNECTDATA[1];
+        while (ecp.Object.Next(1, cd, out var fetched) == Constants.S_OK && fetched == 1)
+        {
+            using var com = DirectN.Extensions.Com.ComObject.FromPointer<IPropertyNotifySink>(cd[0].pUnk);
+            com?.Object.OnChanged(dispId);
+        }
     }
 
     protected T? GetAmbientProperty<T>(DISPID dispid, T? defaultValue = default) => GetAmbientProperty((int)dispid, defaultValue);
@@ -1150,18 +1219,6 @@ public abstract partial class BaseControl : BaseDispatch,
         });
     }
 
-    HRESULT ISpecifyPropertyPages.GetPages(out CAUUID pPages)
-    {
-        var pages = new CAUUID();
-        var hr = TracingUtilities.WrapErrors(() =>
-        {
-            TracingUtilities.Trace($"cElems: {pages.cElems}");
-            return Constants.S_OK;
-        });
-        pPages = pages;
-        return hr;
-    }
-
     HRESULT IConnectionPointContainer.EnumConnectionPoints(out IEnumConnectionPoints ppEnum)
     {
         TracingUtilities.Trace();
@@ -1593,8 +1650,9 @@ public abstract partial class BaseControl : BaseDispatch,
     HRESULT IRunnableObject.GetRunningClass(out Guid lpClsid)
     {
         TracingUtilities.Trace();
-        //lpClsid = GetType().GUID;
+        // is this ok?
         lpClsid = Guid.Empty;
+        //lpClsid = GetType().GUID;
         return Constants.E_UNEXPECTED;
     }
 
@@ -1622,13 +1680,24 @@ public abstract partial class BaseControl : BaseDispatch,
         return Constants.S_OK;
     }
 
+    unsafe HRESULT ISpecifyPropertyPages.GetPages(out CAUUID pPages)
+    {
+        var pages = new CAUUID();
+        var hr = TracingUtilities.WrapErrors(() =>
+        {
+            pages = GetPages();
+            return Constants.S_OK;
+        });
+        pPages = pages;
+        return hr;
+    }
+
     HRESULT ICategorizeProperties.MapPropertyToCategory(DISPID dispid, out PROPCAT ppropcat)
     {
         var propcat = PROPCAT.PROPCAT_Misc;
         var hr = TracingUtilities.WrapErrors(() =>
         {
-            var type = GetDispatchType();
-            propcat = type.GetMember((int)dispid)?.Category.Category ?? PROPCAT.PROPCAT_Misc;
+            propcat = MapPropertyToCategory((int)dispid);
             TracingUtilities.Trace($"dispId: {dispid} cat: {propcat}");
             return Constants.S_OK;
         });
@@ -1641,9 +1710,7 @@ public abstract partial class BaseControl : BaseDispatch,
         var bstr = BSTR.Null;
         var hr = TracingUtilities.WrapErrors(() =>
         {
-            var type = GetDispatchType();
-            var category = type.GetCategory(propcat);
-            var name = category.GetLocalizedName(lcid);
+            var name = GetCategoryName(propcat, lcid);
             bstr = new BSTR(Marshal.StringToBSTR(name));
             TracingUtilities.Trace($"propcat: {propcat} lcid: {lcid} name: '{name}'");
             return Constants.S_OK;
@@ -1652,41 +1719,84 @@ public abstract partial class BaseControl : BaseDispatch,
         return hr;
     }
 
-    HRESULT IPerPropertyBrowsing.GetDisplayString(int dispID, out BSTR pBstr)
+    HRESULT IPerPropertyBrowsing.GetDisplayString(int dispId, out BSTR pBstr)
     {
         var bstr = BSTR.Null;
         var hr = TracingUtilities.WrapErrors(() =>
         {
-            var type = GetDispatchType();
-            var member = type.GetMember(dispID);
-            var name = member?.Info?.Name ?? $"DispID_0x{dispID:X}";
+            var name = GetDisplayString(dispId);
             bstr = new BSTR(Marshal.StringToBSTR(name));
-            TracingUtilities.Trace($"dispId: {dispID} name: '{name}'");
+            TracingUtilities.Trace($"dispId: {dispId} name: '{name}'");
             return Constants.S_OK;
         });
         pBstr = bstr;
         return hr;
     }
 
-    HRESULT IPerPropertyBrowsing.MapPropertyToPage(int dispID, out Guid pClsid)
+    HRESULT IPerPropertyBrowsing.MapPropertyToPage(int dispId, out Guid pClsid)
     {
-        TracingUtilities.Trace($"dispId: {dispID}");
-        pClsid = Guid.Empty;
-        return NotImplemented();
+        var clsid = DefaultPropertyPageId;
+        var hr = TracingUtilities.WrapErrors(() =>
+        {
+            clsid = MapPropertyToPage(dispId);
+            TracingUtilities.Trace($"dispId: {dispId} clsid: {clsid}");
+            return Constants.S_OK;
+        });
+        pClsid = clsid;
+        return hr;
     }
 
-    HRESULT IPerPropertyBrowsing.GetPredefinedStrings(int dispID, out CALPOLESTR pCaStringsOut, out CADWORD pCaCookiesOut)
+    unsafe HRESULT IPerPropertyBrowsing.GetPredefinedStrings(int dispId, out CALPOLESTR pCaStringsOut, out CADWORD pCaCookiesOut)
     {
-        TracingUtilities.Trace($"dispId: {dispID}");
-        pCaStringsOut = new CALPOLESTR();
-        pCaCookiesOut = new CADWORD();
-        return NotImplemented();
+        var str = new CALPOLESTR();
+        var cookies = new CADWORD();
+        var hr = TracingUtilities.WrapErrors(() =>
+        {
+            if (PredefinedStrings.TryGetValue(dispId, out var list) && list.Count > 0)
+            {
+                cookies.cElems = (uint)list.Count;
+                cookies.pElems = Marshal.AllocCoTaskMem(sizeof(uint) * list.Count);
+                var cookiesArray = (uint*)cookies.pElems;
+
+                str.cElems = (uint)list.Count;
+                str.pElems = Marshal.AllocCoTaskMem(sizeof(PWSTR) * list.Count);
+                var strArray = (PWSTR*)str.pElems;
+
+                for (var i = 0; i < list.Count; i++)
+                {
+                    var predefined = list[i];
+                    cookiesArray[i] = predefined.Id;
+                    strArray[i] = new PWSTR(Marshal.StringToCoTaskMemUni(predefined.Name));
+                }
+            }
+            TracingUtilities.Trace($"dispId: {dispId} strings: {str.cElems} cookies: {cookies.cElems}");
+            return Constants.S_OK;
+        });
+        pCaStringsOut = str;
+        pCaCookiesOut = cookies;
+        return hr;
     }
 
-    HRESULT IPerPropertyBrowsing.GetPredefinedValue(int dispID, uint dwCookie, out VARIANT pVarOut)
+    HRESULT IPerPropertyBrowsing.GetPredefinedValue(int dispId, uint dwCookie, out VARIANT pVarOut)
     {
-        TracingUtilities.Trace($"dispId: {dispID} dwCookie: {dwCookie}");
-        pVarOut = new VARIANT();
-        return NotImplemented();
+        TracingUtilities.Trace($"dispId: {dispId} dwCookie: {dwCookie}");
+        var variant = new VARIANT();
+        var hr = TracingUtilities.WrapErrors(() =>
+        {
+            if (PredefinedStrings.TryGetValue(dispId, out var list) && list.Count > 0)
+            {
+                var predefined = list.FirstOrDefault(p => p.Id == dwCookie);
+                if (predefined != null)
+                {
+                    using var v = new Variant(predefined.Value);
+                    variant = v.Detach();
+                    TracingUtilities.Trace($" pVarOut: {variant}");
+                    return Constants.S_OK;
+                }
+            }
+            return Constants.E_INVALIDARG;
+        });
+        pVarOut = variant;
+        return hr;
     }
 }

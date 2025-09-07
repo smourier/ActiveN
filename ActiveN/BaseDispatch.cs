@@ -1,22 +1,88 @@
 ﻿namespace ActiveN;
 
 [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)]
-public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface
+public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface, INotifyPropertyChanged
 {
+    public const string DefaultPropertyPageIdString = "f95db950-a418-462f-bbeb-6f2a3b1fe37b";
+    public static readonly Guid DefaultPropertyPageId = new(DefaultPropertyPageIdString);
+
     private static readonly ConcurrentDictionary<Type, DispatchType> _cache = new();
 
     private ComObject<ITypeInfo>? _typeInfo;
     private bool _typeInfoLoaded;
     private bool _disposedValue;
+
+    public event PropertyChangedEventHandler? PropertyChanged; // stock property change notifications
+
     public bool IsDisposed => _disposedValue;
+
+    protected virtual IDictionary<string, object?> StockProperties { get; } = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+    protected virtual void SetStockProperty(object? value, [CallerMemberName] string? name = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (StockProperties.TryGetValue(name, out var current))
+        {
+            if (Equals(current, value))
+                return;
+
+            StockProperties[name] = value;
+            OnStockPropertyChanged(name);
+        }
+        else
+        {
+            StockProperties[name] = value;
+            OnStockPropertyChanged(name);
+        }
+    }
+
+    protected virtual T? GetStockProperty<T>(T? defaultValue = default, [CallerMemberName] string? name = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (!StockProperties.TryGetValue(name, out var current))
+            return defaultValue;
+
+        if (!Conversions.TryChangeType<T>(current, out var typed))
+            return defaultValue;
+
+        return typed;
+    }
+
+    protected virtual object? GetStockObjectProperty([CallerMemberName] string? name = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (StockProperties.TryGetValue(name, out var current))
+            return current;
+
+        return null;
+    }
 
     protected virtual object? GetTaskResult(Task task) => null;
     protected virtual HWND GetWindowHandle() => HWND.Null;
+    protected virtual IEnumerable<Guid> PropertyPagesIds { get; set; } = [DefaultPropertyPageId];
     protected abstract ComRegistration ComRegistration { get; }
+    protected virtual IDictionary<int, IReadOnlyList<PredefinedString>> PredefinedStrings { get; set; } = new Dictionary<int, IReadOnlyList<PredefinedString>>();
 
     protected virtual int AutoDispidsBase => 0x10000;
 
     protected virtual DispatchType CreateType([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)] Type type) => new(type);
+
+    protected virtual void OnStockPropertyChanged(object sender, PropertyChangedEventArgs e) => PropertyChanged?.Invoke(this, e);
+    protected virtual void OnStockPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(propertyName);
+
+        var type = GetDispatchType();
+        if (type.TryGetDispId(propertyName, out var dispId))
+        {
+            OnStockPropertyChanged(dispId);
+        }
+        OnStockPropertyChanged(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    protected virtual void OnStockPropertyChanged(int dispId)
+    {
+    }
 
     CustomQueryInterfaceResult ICustomQueryInterface.GetInterface(ref Guid iid, out nint ppv) => GetInterface(ref iid, out ppv);
     protected virtual CustomQueryInterfaceResult GetInterface(ref Guid iid, out nint ppv)
@@ -24,6 +90,21 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface
         ppv = 0;
         TracingUtilities.Trace($"iid: {iid.GetName()}");
         return CustomQueryInterfaceResult.NotHandled;
+    }
+
+    protected unsafe virtual CAUUID GetPages()
+    {
+        var pages = new CAUUID();
+        var iids = PropertyPagesIds.ToArray();
+        pages.cElems = (uint)iids.Length;
+        var guids = (Guid*)Marshal.AllocCoTaskMem(sizeof(Guid) * (int)pages.cElems);
+        for (var i = 0; i < iids.Length; i++)
+        {
+            TracingUtilities.Trace($"add: {iids[i]}");
+            guids[i] = iids[i];
+        }
+        pages.pElems = (nint)guids;
+        return pages;
     }
 
     protected virtual ComObject<ITypeInfo>? EnsureTypeInfo()
@@ -423,5 +504,41 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface
                 Functions.DispatchMessageW(msg);
             }
         } while (true);
+    }
+
+    protected virtual PROPCAT MapPropertyToCategory(int dispid)
+    {
+        var type = GetDispatchType();
+        return type.GetMember((int)dispid)?.Category.Category ?? PROPCAT.PROPCAT_Misc;
+    }
+
+    protected virtual string GetCategoryName(PROPCAT propcat, uint lcid)
+    {
+        var type = GetDispatchType();
+        var category = type.GetCategory(propcat);
+        return category.GetLocalizedName(lcid);
+    }
+
+    protected virtual string GetDisplayString(int dispId)
+    {
+        var type = GetDispatchType();
+        var member = type.GetMember(dispId);
+        return member?.Info?.Name ?? $"DispID_0x{dispId:X}";
+    }
+
+    protected virtual Guid MapPropertyToPage(int dispId)
+    {
+        var type = GetDispatchType();
+        var member = type.GetMember(dispId);
+        return member?.PropertyPageId ?? DefaultPropertyPageId;
+    }
+
+    public class PredefinedString(uint id, string name)
+    {
+        public uint Id { get; } = id;
+        public string Name { get; } = name;
+        public virtual object? Value { get; set; }
+
+        public override string ToString() => $"{Id} '{Name}': {Value}";
     }
 }
