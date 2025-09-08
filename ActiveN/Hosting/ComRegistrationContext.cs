@@ -8,11 +8,19 @@ public class ComRegistrationContext(
     public ComRegistration Registration { get; } = registration;
     public RegistryKey RegistryRoot { get; } = registryRoot;
     public ComRegistrationType Type { get; } = type;
-    public virtual Guid GUID { get; set; } = type.Type.GUID;
+    public bool PerUser => RegistryRoot == Registry.CurrentUser;
+    public Guid Clsid => Type.Type.GUID;
+    public string? FullName => Type.Type.FullName;
+    public string ClassesRegistryKey => @"Software\Classes";
+    public string ClsidRegistryKey => ClassesRegistryKey + @"\CLSID";
 
     // not sure what a good default is here
     public virtual OLEMISC MiscStatus { get; set; } = OLEMISC.OLEMISC_RECOMPOSEONRESIZE | OLEMISC.OLEMISC_CANTLINKINSIDE | OLEMISC.OLEMISC_INSIDEOUT | OLEMISC.OLEMISC_ACTIVATEWHENVISIBLE | OLEMISC.OLEMISC_SETCLIENTSITEFIRST;
     public virtual TypeLib? TypeLib { get; set; }
+
+    // default is "Both" note: not all of the code currently supports full multithreading
+    // also note aggregation doesn't work if server & client threading models are not compatible (MTA vs STA and the reverse)
+    public virtual string? ThreadingModel { get; protected set; }
 
     public virtual IList<Guid> ImplementedCategories { get; } =
     [
@@ -21,6 +29,7 @@ public class ComRegistrationContext(
         ControlCategories.CATID_Insertable,
         ControlCategories.CATID_SafeForScripting,
         ControlCategories.CATID_SafeForInitializing,
+        ControlCategories.CATID_ActiveXControls,
         ControlCategories.CATID_Control,
     ];
 }

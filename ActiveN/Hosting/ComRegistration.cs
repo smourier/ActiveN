@@ -57,11 +57,8 @@ public abstract partial class ComRegistration
     public IDictionary<Guid, ClassFactory> ClassFactories => _classFactories;
     public string DllPath => _dllPath.Value;
     public virtual bool RegisterEmbeddedTypeLib { get; protected set; }
-    public virtual bool InstallInHkcu { get; protected set; }
+    public virtual ComRegistrationTarget Target { get; protected set; }
     public virtual bool CanUnload { get; protected set; }
-    // default is "Both" note: not all of the code currently supports full multithreading
-    // also note aggregation doesn't work if server & client threading models are not compatible (MTA vs STA and the reverse)
-    public virtual string? ThreadingModel { get; protected set; }
     public string? ThunkDllPath { get; protected set; }
     public string RegistrationDllPath => ThunkDllPath ?? DllPath;
 
@@ -106,51 +103,62 @@ public abstract partial class ComRegistration
             typeLib = TypeLib.Load(DllPath);
             if (typeLib != null)
             {
-                typeLib.Register(InstallInHkcu);
+                typeLib.Register(Target);
                 TracingUtilities.Trace($"Registered type library {typeLib.TypeLibId} '{typeLib.Name}' ('{typeLib.Documentation}') version {typeLib.MajorVersion}.{typeLib.MinorVersion}");
             }
         }
 
-        var root = InstallInHkcu ? Registry.CurrentUser : Registry.LocalMachine;
+        var root = GetRegistryRoot(Target);
         foreach (var type in ComTypes)
         {
-            RegisterType(type, root, typeLib);
+            var ctx = CreateRegistrationContext(GetRegistryRoot(Target), type);
+            ctx.TypeLib = typeLib;
+            RegisterType(ctx);
         }
         return Constants.S_OK;
     }, () => UnregisterServer());
 
-    protected virtual void RegisterType(ComRegistrationType type, RegistryKey registryRoot, TypeLib? typeLib)
+    protected virtual void RegisterType(ComRegistrationContext context)
     {
-        ArgumentNullException.ThrowIfNull(type);
-        ArgumentNullException.ThrowIfNull(registryRoot);
-        TracingUtilities.Trace($"Type: {type.Type.FullName} guid: {type.Type.GUID}");
-        RegisterInProcessComObject(registryRoot, type.Type, RegistrationDllPath, ThreadingModel);
+        ArgumentNullException.ThrowIfNull(context);
+        TracingUtilities.Trace($"Type: {context.Type.Type.FullName} guid: {context.Clsid}");
+        RegisterInProcessComObject(context);
 
         if (RegisterEmbeddedTypeLib)
         {
-            typeLib?.RegisterForCoClass(type.Type.GUID, registryRoot);
+            context.TypeLib?.RegisterForCoClass(context);
         }
 
-        var method = type.Type.GetMethod(nameof(RegisterType), BindingFlags.Public | BindingFlags.Static);
+        var miscStatus = context.MiscStatus;
+        var method = context.Type.Type.GetMethod(nameof(RegisterType), BindingFlags.Public | BindingFlags.Static);
         if (method != null)
         {
-            var ctx = CreateRegistrationContext(registryRoot, type) ?? throw new InvalidOperationException();
-            ctx.TypeLib = typeLib;
-
-            var misc = type.Type.GetCustomAttribute<MiscStatusAttribute>();
+            var misc = context.Type.Type.GetCustomAttribute<MiscStatusAttribute>();
             if (misc != null)
             {
-                ctx.MiscStatus = misc.Value;
+                context.MiscStatus = misc.Value;
             }
 
-            method.Invoke(null, [ctx]);
+            method.Invoke(null, [context]);
         }
+        context.MiscStatus = miscStatus;
+    }
+
+    public static RegistryKey GetRegistryRoot(ComRegistrationTarget target)
+    {
+        if (target == ComRegistrationTarget.HKEY_CURRENT_USER)
+            return Registry.CurrentUser;
+
+        if (target == ComRegistrationTarget.HKEY_LOCAL_MACHINE)
+            return Registry.LocalMachine;
+
+        return SystemUtilities.GetTokenElevationType() == TokenElevationType.Limited ? Registry.CurrentUser : Registry.LocalMachine;
     }
 
     protected virtual HRESULT UnregisterServer() => TracingUtilities.WrapErrors(() =>
     {
         TracingUtilities.Trace($"Path: {DllPath}");
-        var root = InstallInHkcu ? Registry.CurrentUser : Registry.LocalMachine;
+        var root = GetRegistryRoot(Target);
 
         TypeLib? typeLib = null;
         if (RegisterEmbeddedTypeLib)
@@ -158,38 +166,34 @@ public abstract partial class ComRegistration
             typeLib = TypeLib.Load(DllPath);
             if (typeLib != null)
             {
-                typeLib.UnregisterTypeLib(InstallInHkcu);
-                TracingUtilities.Trace($"Unregistered type library {typeLib.TypeLibId} '{typeLib.Name}' ('{typeLib.Documentation}') version {typeLib.MajorVersion}.{typeLib.MinorVersion}");
+                // don't throw on error here, we want to continue unregistering other stuff
+                var hr = typeLib.Unregister(Target, false);
+                TracingUtilities.Trace($"Unregistered type library {typeLib.TypeLibId} '{typeLib.Name}' ('{typeLib.Documentation}') version {typeLib.MajorVersion}.{typeLib.MinorVersion} hr: {hr}");
             }
         }
 
         foreach (var type in ComTypes)
         {
-            UnregisterType(type, root, typeLib);
+            var ctx = CreateRegistrationContext(GetRegistryRoot(Target), type);
+            ctx.TypeLib = typeLib;
+            UnregisterType(ctx);
         }
-
         return Constants.S_OK;
     });
 
     // unregistering should not throw but try to continue
-    protected virtual void UnregisterType(ComRegistrationType type, RegistryKey registryRoot, TypeLib? typeLib)
+    protected virtual void UnregisterType(ComRegistrationContext context)
     {
-        ArgumentNullException.ThrowIfNull(type);
-        ArgumentNullException.ThrowIfNull(registryRoot);
-        UnregisterComObject(registryRoot, type.Type);
+        ArgumentNullException.ThrowIfNull(context);
+        UnregisterComObject(context);
 
         if (RegisterEmbeddedTypeLib)
         {
-            typeLib?.UnregisterForCoClass(type.Type.GUID, registryRoot);
+            context.TypeLib?.UnregisterForCoClass(context.Clsid, context.RegistryRoot);
         }
 
-        var method = type.Type.GetMethod(nameof(UnregisterType), BindingFlags.Public | BindingFlags.Static);
-        if (method != null)
-        {
-            var ctx = CreateRegistrationContext(registryRoot, type) ?? throw new InvalidOperationException();
-            ctx.TypeLib = typeLib;
-            method.Invoke(null, [ctx]);
-        }
+        var method = context.Type.Type.GetMethod(nameof(UnregisterType), BindingFlags.Public | BindingFlags.Static);
+        method?.Invoke(null, [context]);
     }
 
     protected virtual object? GetClassObject(Guid clsid, Guid iid)
@@ -244,9 +248,13 @@ public abstract partial class ComRegistration
         {
             var cmdLine = Marshal.PtrToStringUni(cmdLinePtr);
             TracingUtilities.Trace($"CmdLine: {cmdLine}");
-            if (string.Equals(cmdLine, "user", StringComparison.OrdinalIgnoreCase))
+            if (cmdLine.EqualsIgnoreCase("user"))
             {
-                InstallInHkcu = true;
+                Target = ComRegistrationTarget.HKEY_CURRENT_USER;
+            }
+            else if (cmdLine.EqualsIgnoreCase("machine") || cmdLine.EqualsIgnoreCase("admin"))
+            {
+                Target = ComRegistrationTarget.HKEY_LOCAL_MACHINE;
             }
         }
 
@@ -266,65 +274,58 @@ public abstract partial class ComRegistration
         return 0;
     });
 
-    public const string ClassesRegistryKey = @"Software\Classes";
-    public const string ClsidRegistryKey = ClassesRegistryKey + @"\CLSID";
-
-    public static void RegisterInProcessComObject(RegistryKey root, Type type, string assemblyPath, string? threadingModel = null)
+    public virtual void RegisterInProcessComObject(ComRegistrationContext context)
     {
-        ArgumentNullException.ThrowIfNull(root);
-        ArgumentNullException.ThrowIfNull(type);
-        ArgumentNullException.ThrowIfNull(assemblyPath);
+        ArgumentNullException.ThrowIfNull(context);
 
-        threadingModel = threadingModel?.Trim() ?? "Both";
-        TracingUtilities.Trace($"Registering {type.FullName} from {assemblyPath} with threading model '{threadingModel}'...");
-        using var serverKey = EnsureWritableSubKey(root, Path.Combine(ClsidRegistryKey, type.GUID.ToString("B"), "InprocServer32"));
-        serverKey.SetValue(null, assemblyPath);
+        var threadingModel = context.ThreadingModel?.Nullify() ?? "Both";
+        TracingUtilities.Trace($"Registering {context.FullName} from {RegistrationDllPath} with threading model '{threadingModel}'...");
+        using var serverKey = EnsureWritableSubKey(context.RegistryRoot, Path.Combine(context.ClsidRegistryKey, context.Clsid.ToString("B"), "InprocServer32"));
+        serverKey.SetValue(null, RegistrationDllPath);
         serverKey.SetValue("ThreadingModel", threadingModel);
 
         // ProgId is optional
-        var att = type.GetCustomAttribute<ProgIdAttribute>();
-        if (att != null && !string.IsNullOrWhiteSpace(att.Value))
+        var progid = context.Type.Type.GetCustomAttribute<ProgIdAttribute>()?.Value.Nullify();
+        if (progid != null)
         {
-            var progid = att.Value.Trim();
-            using var key = EnsureWritableSubKey(root, Path.Combine(ClsidRegistryKey, type.GUID.ToString("B")));
+            using var key = EnsureWritableSubKey(context.RegistryRoot, Path.Combine(context.ClsidRegistryKey, context.Clsid.ToString("B")));
             using var progIdKey = EnsureWritableSubKey(key, "ProgId");
             progIdKey.SetValue(null, progid);
 
             using var viProgIdKey = EnsureWritableSubKey(key, "VersionIndependentProgID");
             viProgIdKey.SetValue(null, progid);
 
-            using var ckey = EnsureWritableSubKey(root, Path.Combine(ClassesRegistryKey, progid, "CLSID"));
-            ckey.SetValue(null, type.GUID.ToString("B"));
+            using var ckey = EnsureWritableSubKey(context.RegistryRoot, Path.Combine(context.ClassesRegistryKey, progid, "CLSID"));
+            ckey.SetValue(null, context.Clsid.ToString("B"));
         }
 
-        var dna = type.GetCustomAttribute<DisplayNameAttribute>();
-        if (dna != null && !string.IsNullOrWhiteSpace(dna.DisplayName))
+        var name = context.Type.Type.GetCustomAttribute<DisplayNameAttribute>()?.DisplayName.Nullify();
+        if (name != null)
         {
-            using var key = EnsureWritableSubKey(root, Path.Combine(ClsidRegistryKey, type.GUID.ToString("B")));
-            key.SetValue(null, dna.DisplayName);
+            using var key = EnsureWritableSubKey(context.RegistryRoot, Path.Combine(context.ClsidRegistryKey, context.Clsid.ToString("B")));
+            key.SetValue(null, name);
         }
-        TracingUtilities.Trace($"Registered {type.FullName}.");
+        TracingUtilities.Trace($"Registered {context.FullName}.");
     }
 
-    public static void UnregisterComObject(RegistryKey root, Type type)
+    public virtual void UnregisterComObject(ComRegistrationContext context)
     {
-        ArgumentNullException.ThrowIfNull(root);
-        ArgumentNullException.ThrowIfNull(type);
+        ArgumentNullException.ThrowIfNull(context);
 
-        TracingUtilities.Trace($"Unregistering {type.FullName}...");
-        using var key = root.OpenSubKey(ClsidRegistryKey, true);
-        key?.DeleteSubKeyTree(type.GUID.ToString("B"), false);
+        TracingUtilities.Trace($"Unregistering {context.FullName}...");
+        using var key = context.RegistryRoot.OpenSubKey(context.ClsidRegistryKey, true);
+        key?.DeleteSubKeyTree(context.Clsid.ToString("B"), false);
 
         // ProgId is optional
-        var att = type.GetCustomAttribute<ProgIdAttribute>();
+        var att = context.Type.Type.GetCustomAttribute<ProgIdAttribute>();
         if (att != null && !string.IsNullOrWhiteSpace(att.Value))
         {
             var progid = att.Value.Trim();
-            using var ckey = root.OpenSubKey(ClassesRegistryKey, true);
+            using var ckey = context.RegistryRoot.OpenSubKey(context.ClassesRegistryKey, true);
             ckey?.DeleteSubKeyTree(progid, false);
         }
 
-        TracingUtilities.Trace($"Unregistered {type.FullName}.");
+        TracingUtilities.Trace($"Unregistered {context.FullName}.");
     }
 
     public static RegistryKey EnsureWritableSubKey(RegistryKey root, string name)

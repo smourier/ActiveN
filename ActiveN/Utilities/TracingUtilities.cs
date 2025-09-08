@@ -6,11 +6,18 @@ public static class TracingUtilities
     [Guid("9a604ee7-e630-3ded-9444-baae247075ab")]
     private partial interface IFormattable { }
 
+    // office's VBA asks for this
     [Guid("049948d1-5686-11cf-8e0d-00aa00a74c5c")]
     private partial interface IPersistHTML { }
 
     [Guid("e19c7100-9709-4db7-9373-e7b518b47086")]
     private partial interface IOfficeSafetyRelated { }
+
+    // office's VBA asks for this
+    [Guid("C62A69F0-16DC-11CE-9E98-00AA00574A4F")]
+#pragma warning disable IDE1006 // Naming Styles
+    private partial interface IForms20Form { }
+#pragma warning restore IDE1006 // Naming Styles
 
     // write all traces on a single thread to avoid garbling the output
     private static int _threadId;

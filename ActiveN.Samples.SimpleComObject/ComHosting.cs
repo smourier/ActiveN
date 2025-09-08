@@ -13,7 +13,6 @@ public class ComHosting : ComRegistration
     {
     }
 
-    public override bool InstallInHkcu => true;
     public override bool CanUnload => true;
 
     // these are the standard COM DLL exports that *must* be declared

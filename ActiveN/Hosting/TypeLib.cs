@@ -27,13 +27,13 @@ public sealed class TypeLib
         return obj != null ? new ComObject<ITypeLib>(obj) : null;
     }
 
-    public void RegisterForCoClass(Guid clsid, RegistryKey registryRoot)
+    public void RegisterForCoClass(ComRegistrationContext context)
     {
-        ArgumentNullException.ThrowIfNull(registryRoot);
-        using var typeLib = ComRegistration.EnsureWritableSubKey(registryRoot, Path.Combine(ComRegistration.ClsidRegistryKey, clsid.ToString("B"), "TypeLib"));
+        ArgumentNullException.ThrowIfNull(context);
+        using var typeLib = ComRegistration.EnsureWritableSubKey(context.RegistryRoot, Path.Combine(context.ClsidRegistryKey, context.Clsid.ToString("B"), "TypeLib"));
         typeLib.SetValue(null, TypeLibId.ToString("B"));
 
-        using var version = ComRegistration.EnsureWritableSubKey(registryRoot, Path.Combine(ComRegistration.ClsidRegistryKey, clsid.ToString("B"), "Version"));
+        using var version = ComRegistration.EnsureWritableSubKey(context.RegistryRoot, Path.Combine(context.ClsidRegistryKey, context.Clsid.ToString("B"), "Version"));
         // if type lib is there, it will update it later
         version.SetValue(null, $"{MajorVersion}.{MinorVersion}");
     }
@@ -48,33 +48,38 @@ public sealed class TypeLib
         // nothing to do here, the whole CLSID key is removed by ComRegistration
     }
 
-    public bool Register(bool perUser, bool throwOnError = true)
+    public HRESULT Register(ComRegistrationTarget target, bool throwOnError = true)
     {
         using var typeLib = LoadTypeLib(FilePath, throwOnError);
         if (typeLib == null)
-            return false;
+            return Constants.S_FALSE;
 
+        HRESULT hr;
+        var perUser = ComRegistration.GetRegistryRoot(target) == Registry.CurrentUser;
         if (perUser)
         {
-            Functions.RegisterTypeLibForUser(typeLib.Object, PWSTR.From(FilePath), PWSTR.Null).ThrowOnError(throwOnError);
+            hr = Functions.RegisterTypeLibForUser(typeLib.Object, PWSTR.From(FilePath), PWSTR.Null).ThrowOnError(throwOnError);
         }
         else
         {
-            Functions.RegisterTypeLib(typeLib.Object, PWSTR.From(FilePath), PWSTR.Null).ThrowOnError(throwOnError);
+            hr = Functions.RegisterTypeLib(typeLib.Object, PWSTR.From(FilePath), PWSTR.Null).ThrowOnError(throwOnError);
         }
-        return true;
+        return hr;
     }
 
-    public void UnregisterTypeLib(bool perUser, bool throwOnError = true)
+    public HRESULT Unregister(ComRegistrationTarget target, bool throwOnError = true)
     {
+        HRESULT hr;
+        var perUser = ComRegistration.GetRegistryRoot(target) == Registry.CurrentUser;
         if (perUser)
         {
-            Functions.UnRegisterTypeLibForUser(TypeLibId, MajorVersion, MinorVersion, Lcid, SysKind).ThrowOnError(throwOnError);
+            hr = Functions.UnRegisterTypeLibForUser(TypeLibId, MajorVersion, MinorVersion, Lcid, SysKind).ThrowOnError(throwOnError);
         }
         else
         {
-            Functions.UnRegisterTypeLib(TypeLibId, MajorVersion, MinorVersion, Lcid, SysKind).ThrowOnError(throwOnError);
+            hr = Functions.UnRegisterTypeLib(TypeLibId, MajorVersion, MinorVersion, Lcid, SysKind).ThrowOnError(throwOnError);
         }
+        return hr;
     }
 
     public static unsafe TypeLib? Load(string filePath, bool throwOnError = true)

@@ -17,7 +17,9 @@ public abstract partial class BaseControl : BaseDispatch,
     DirectN.IServiceProvider,
     IProvideClassInfo,
     IProvideClassInfo2,
+    IPersist,
     IPersistStreamInit,
+    IPersistStorage,
     IViewObject2,
     IViewObjectEx,
     IPointerInactive,
@@ -87,6 +89,7 @@ public abstract partial class BaseControl : BaseDispatch,
     protected virtual uint CurrentSafetyOptions { get; set; }
     protected virtual Window? Window => _window;
     protected virtual SIZE? HiMetricNaturalExtent => null;
+    protected virtual string StreamName => "Contents";
     protected virtual ControlState State { get; private set; }
     protected virtual bool IsDirty { get; set; }
     protected virtual int FreezeCount { get; set; }
@@ -268,20 +271,66 @@ public abstract partial class BaseControl : BaseDispatch,
         _window?.SetWindowPos(HWND.Null, position.left, position.top, position.Width, position.Height, SET_WINDOW_POS_FLAGS.SWP_NOZORDER | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE);
     }
 
-    protected virtual HRESULT Save(IStream stream, bool clearDirty)
+    protected virtual void LoadAll(Stream stream)
     {
+        ArgumentNullException.ThrowIfNull(stream);
+    }
+
+    protected virtual void SaveAll(Stream stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+    }
+
+    protected virtual void Load(Stream stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        LoadAll(stream);
+        IsDirty = false;
+        ChangeState(ControlState.Loaded);
+    }
+
+    protected virtual void Save(Stream stream, bool clearDirty)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        SaveAll(stream);
         if (clearDirty)
         {
             IsDirty = false;
         }
-        return Constants.S_OK;
+        SendOnSave();
     }
 
-    protected virtual HRESULT Load(IStream stream)
+    private string GetStreamName() => StreamName.Nullify() ?? throw new InvalidOperationException($"{nameof(StreamName)} cannot be null or empty.");
+
+    protected virtual HRESULT Save(IStorage storage, bool sameAsLoad) => TracingUtilities.WrapErrors(() =>
     {
-        IsDirty = false;
-        return Constants.S_OK;
-    }
+        ArgumentNullException.ThrowIfNull(storage);
+
+        var name = GetStreamName();
+        var hr = storage.CreateStream(PWSTR.From(name), STGM.STGM_CREATE | STGM.STGM_READWRITE | STGM.STGM_SHARE_EXCLUSIVE, 0, 0, out var streamObj);
+        if (hr.IsSuccess && streamObj != null)
+        {
+            using var stream = new ComObject<IStream>(streamObj);
+            using var sois = new StreamOnIStream(stream.Object, true);
+            Save(sois, sameAsLoad);
+        }
+        return hr;
+    });
+
+    protected virtual HRESULT Load(IStorage storage) => TracingUtilities.WrapErrors(() =>
+    {
+        ArgumentNullException.ThrowIfNull(storage);
+
+        var name = GetStreamName();
+        var hr = storage.OpenStream(PWSTR.From(name), 0, STGM.STGM_DIRECT | STGM.STGM_SHARE_EXCLUSIVE, 0, out var streamObj);
+        if (hr.IsSuccess && streamObj != null)
+        {
+            using var stream = new ComObject<IStream>(streamObj);
+            using var sois = new StreamOnIStream(stream.Object, true);
+            Load(sois);
+        }
+        return hr;
+    });
 
     protected virtual void SendOnDataChanged(ADVF advf = 0)
     {
@@ -339,6 +388,15 @@ public abstract partial class BaseControl : BaseDispatch,
         TracingUtilities.Trace($"Changing state from {State} to {newState}");
         if (newState == State)
             return;
+
+        if (newState == ControlState.Loaded)
+        {
+            if (State == ControlState.New)
+            {
+                State = newState;
+            }
+            return;
+        }
 
         var oldState = State;
         State = newState;
@@ -497,7 +555,7 @@ public abstract partial class BaseControl : BaseDispatch,
     {
         TracingUtilities.Trace($"sender: {sender} type: {e.Value.ResizedType} size: {e.Value.Size}");
         SendOnViewChange();
-        SendOnDataChanged();
+        //SendOnDataChanged();
     }
 
     protected virtual void OnWindowFocusChanged(object? sender, ValueEventArgs<bool> e)
@@ -606,7 +664,7 @@ public abstract partial class BaseControl : BaseDispatch,
         TracingUtilities.Trace($"Register type {typeof(BaseControl).FullName}...");
 
         // add the "Control" subkey to indicate that this is an ActiveX control
-        using var key = ComRegistration.EnsureWritableSubKey(context.RegistryRoot, Path.Combine(ComRegistration.ClsidRegistryKey, context.GUID.ToString("B")));
+        using var key = ComRegistration.EnsureWritableSubKey(context.RegistryRoot, Path.Combine(context.ClsidRegistryKey, context.Clsid.ToString("B")));
 
         if (context.ImplementedCategories.Contains(ControlCategories.CATID_Control))
         {
@@ -623,13 +681,20 @@ public abstract partial class BaseControl : BaseDispatch,
             key.CreateSubKey("Programmable", false)?.Dispose();
         }
 
-        if (context.ImplementedCategories?.Count > 0)
+        if (context.ImplementedCategories.Count > 0)
         {
             using var cats = key.CreateSubKey("Implemented Categories", true);
             foreach (var cat in context.ImplementedCategories)
             {
                 cats.CreateSubKey($"{cat:B}", false)?.Dispose();
             }
+        }
+
+        var progid = context.Type.Type.GetCustomAttribute<ProgIdAttribute>()?.Value.Nullify();
+        if (progid != null && context.ImplementedCategories.Contains(ControlCategories.CATID_Insertable))
+        {
+            // add the "Control" subkey to indicate that this is an ActiveX control
+            using var ckey = ComRegistration.EnsureWritableSubKey(context.RegistryRoot, Path.Combine(context.ClassesRegistryKey, progid, "Insertable"));
         }
 
         using var miscStatus = key.CreateSubKey("MiscStatus", true);
@@ -923,52 +988,6 @@ public abstract partial class BaseControl : BaseDispatch,
             return Constants.E_INVALIDARG;
         });
         pGUID = guid;
-        return hr;
-    }
-
-    HRESULT IPersistStreamInit.IsDirty()
-    {
-        TracingUtilities.Trace($"IsDirty: {IsDirty}");
-        return IsDirty ? Constants.S_OK : Constants.S_FALSE;
-    }
-
-    HRESULT IPersistStreamInit.Load(IStream pStm) => TracingUtilities.WrapErrors(() =>
-    {
-        var hr = Load(pStm);
-        TracingUtilities.Trace($"pStm {pStm} hr: {hr}");
-        ChangeState(ControlState.Loaded);
-        return hr;
-    });
-
-    HRESULT IPersistStreamInit.GetSizeMax(out ulong pCbSize) { pCbSize = 0; return NotImplemented(); }
-    HRESULT IPersistStreamInit.Save(IStream pStm, BOOL fClearDirty) => TracingUtilities.WrapErrors(() =>
-    {
-        var hr = Save(pStm, fClearDirty);
-        TracingUtilities.Trace($"pStm {pStm} fClearDirty: {fClearDirty} hr: {hr}");
-        if (hr.IsSuccess)
-        {
-            SendOnSave();
-        }
-        return hr;
-    });
-
-    HRESULT IPersistStreamInit.InitNew() => TracingUtilities.WrapErrors(() =>
-    {
-        IsDirty = true;
-        TracingUtilities.Trace();
-        return Constants.S_OK;
-    });
-
-    HRESULT IPersist.GetClassID(out Guid pClassID)
-    {
-        var classID = Guid.Empty;
-        var hr = TracingUtilities.WrapErrors(() =>
-        {
-            classID = GetType().GUID;
-            TracingUtilities.Trace($"pClassID: {classID}");
-            return Constants.S_OK;
-        });
-        pClassID = classID;
         return hr;
     }
 
@@ -1823,5 +1842,91 @@ public abstract partial class BaseControl : BaseDispatch,
         });
         pVarOut = variant;
         return hr;
+    }
+
+
+    HRESULT IPersistStreamInit.IsDirty()
+    {
+        TracingUtilities.Trace($"IsDirty: {IsDirty}");
+        return IsDirty ? Constants.S_OK : Constants.S_FALSE;
+    }
+
+    HRESULT IPersistStreamInit.Load(IStream pStm) => TracingUtilities.WrapErrors(() =>
+    {
+        ArgumentNullException.ThrowIfNull(pStm);
+        TracingUtilities.Trace($"pStm {pStm}");
+        using var sois = new StreamOnIStream(pStm, true);
+        Load(sois);
+        return Constants.S_OK;
+    });
+
+    HRESULT IPersistStreamInit.GetSizeMax(out ulong pCbSize) { pCbSize = 0; return NotImplemented(); }
+    HRESULT IPersistStreamInit.Save(IStream pStm, BOOL fClearDirty) => TracingUtilities.WrapErrors(() =>
+    {
+        ArgumentNullException.ThrowIfNull(pStm);
+        TracingUtilities.Trace($"pStm {pStm} fClearDirty: {fClearDirty}");
+        using var sois = new StreamOnIStream(pStm, true);
+        Save(sois, fClearDirty);
+        SendOnSave();
+        return Constants.S_OK;
+    });
+
+    HRESULT IPersistStreamInit.InitNew() => TracingUtilities.WrapErrors(() =>
+    {
+        IsDirty = true;
+        TracingUtilities.Trace();
+        return Constants.S_OK;
+    });
+
+    HRESULT IPersist.GetClassID(out Guid pClassID)
+    {
+        var classID = Guid.Empty;
+        var hr = TracingUtilities.WrapErrors(() =>
+        {
+            classID = GetType().GUID;
+            TracingUtilities.Trace($"pClassID: {classID}");
+            return Constants.S_OK;
+        });
+        pClassID = classID;
+        return hr;
+    }
+
+    HRESULT IPersistStorage.IsDirty()
+    {
+        TracingUtilities.Trace($"IsDirty: {IsDirty}");
+        return IsDirty ? Constants.S_OK : Constants.S_FALSE;
+    }
+
+    HRESULT IPersistStorage.InitNew(IStorage pStg)
+    {
+        IsDirty = true;
+        TracingUtilities.Trace();
+        return Constants.S_OK;
+    }
+
+    HRESULT IPersistStorage.Load(IStorage pStg) => TracingUtilities.WrapErrors(() =>
+    {
+        var hr = Load(pStg);
+        TracingUtilities.Trace($"pStg {pStg} hr: {hr}");
+        return hr;
+    });
+
+    HRESULT IPersistStorage.Save(IStorage pStgSave, BOOL fSameAsLoad) => TracingUtilities.WrapErrors(() =>
+    {
+        var hr = Save(pStgSave, fSameAsLoad);
+        TracingUtilities.Trace($"pStgSave {pStgSave} fSameAsLoad: {fSameAsLoad} hr: {hr}");
+        return hr;
+    });
+
+    HRESULT IPersistStorage.SaveCompleted(IStorage pStgNew)
+    {
+        TracingUtilities.Trace($"pStgNew: {pStgNew}");
+        return Constants.S_OK;
+    }
+
+    HRESULT IPersistStorage.HandsOffStorage()
+    {
+        TracingUtilities.Trace();
+        return Constants.S_OK;
     }
 }
