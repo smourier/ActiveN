@@ -3,9 +3,6 @@
 [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)]
 public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface, INotifyPropertyChanged
 {
-    public const string DefaultPropertyPageIdString = "f95db950-a418-462f-bbeb-6f2a3b1fe37b";
-    public static readonly Guid DefaultPropertyPageId = new(DefaultPropertyPageIdString);
-
     private static readonly ConcurrentDictionary<Type, DispatchType> _cache = new();
 
     private ComObject<ITypeInfo>? _typeInfo;
@@ -59,7 +56,7 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
 
     protected virtual object? GetTaskResult(Task task) => null;
     protected virtual HWND GetWindowHandle() => HWND.Null;
-    protected virtual IEnumerable<Guid> PropertyPagesIds { get; set; } = [DefaultPropertyPageId];
+    protected virtual IEnumerable<Guid> PropertyPagesIds { get; set; } = [];
     protected abstract ComRegistration ComRegistration { get; }
     protected virtual IDictionary<int, IReadOnlyList<PredefinedString>> PredefinedStrings { get; set; } = new Dictionary<int, IReadOnlyList<PredefinedString>>();
 

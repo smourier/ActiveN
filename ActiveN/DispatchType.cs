@@ -149,7 +149,7 @@ public class DispatchType([DynamicallyAccessedMembers(DynamicallyAccessedMemberT
                 member.DefaultString = page.DefaultString;
             }
 
-            member.PropertyPageId = method?.GetCustomAttribute<PropertyPageAttribute>()?.Guid ?? BaseDispatch.DefaultPropertyPageId;
+            member.PropertyPageId = method?.GetCustomAttribute<PropertyPageAttribute>()?.Guid;
             _membersByName[name] = member;
             _memberByDispIds[member.DispId] = member;
         }
@@ -182,7 +182,7 @@ public class DispatchType([DynamicallyAccessedMembers(DynamicallyAccessedMemberT
                 member.DefaultString = page.DefaultString;
             }
 
-            member.PropertyPageId = property?.GetCustomAttribute<PropertyPageAttribute>()?.Guid ?? BaseDispatch.DefaultPropertyPageId;
+            member.PropertyPageId = property?.GetCustomAttribute<PropertyPageAttribute>()?.Guid;
             _membersByName[name] = member;
             _memberByDispIds[member.DispId] = member;
         }

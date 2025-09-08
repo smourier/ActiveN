@@ -1,5 +1,4 @@
-﻿
-namespace ActiveN.Samples.PdfView;
+﻿namespace ActiveN.Samples.PdfView;
 
 // TODO: generate another GUID, change ProgId and DisplayName
 // This GUID *must* match the one in the corresponding .idl coclass
@@ -30,10 +29,12 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
         _eventsConnectionPoint = new DispatchConnectionPoint(IID_IPdfViewControlEvents);
         AddConnectionPoint(_eventsConnectionPoint);
         PropertyPagesIds = [
-            DefaultPropertyPageId,
-            Constants.CLSID_StockFontPage,
-            Constants.CLSID_StockColorPage,
-            Constants.CLSID_StockPicturePage
+            typeof(PdfViewControlPage).GUID,
+
+            // these seems to exist only in x86 Windows
+            //Constants.CLSID_StockFontPage,
+            //Constants.CLSID_StockColorPage,
+            //Constants.CLSID_StockPicturePage
             ];
     }
 
@@ -131,7 +132,7 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
     // category (for host that support a property grid editor like VB/VBA)
     // can match PROPCAT_XXX or be a custom string
     [Category("Appearance")]
-    [PropertyPage(DefaultPropertyPageIdString)]
+    [PropertyPage(PdfViewControlPage.ClsidString)]
     public bool ShowControls { get => GetStockProperty(true); set => SetStockProperty(value); }
     HRESULT IPdfViewControl.get_ShowControls(out VARIANT_BOOL value) { value = ShowControls; return Constants.S_OK; }
     HRESULT IPdfViewControl.set_ShowControls(VARIANT_BOOL value) { ShowControls = value; return Constants.S_OK; }

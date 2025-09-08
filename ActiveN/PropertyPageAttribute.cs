@@ -4,14 +4,14 @@
 public sealed class PropertyPageAttribute(string clsid) : Attribute
 {
     public string Clsid { get; } = clsid;
-    public Guid Guid
+    public Guid? Guid
     {
         get
         {
-            if (Guid.TryParse(Clsid, out var guid))
+            if (System.Guid.TryParse(Clsid, out var guid))
                 return guid;
 
-            return BaseDispatch.DefaultPropertyPageId;
+            return null;
         }
     }
 

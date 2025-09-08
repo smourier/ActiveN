@@ -13,7 +13,7 @@ public class DispatchMember
     public int DispId { get; }
     public DispatchCategory Category { get; }
     public MemberInfo? Info { get; } // if null, means the method/property is in the TLB but not in the actual type
-    public virtual Guid PropertyPageId { get; set; } = BaseDispatch.DefaultPropertyPageId;
+    public virtual Guid? PropertyPageId { get; set; }
     public virtual string? DefaultString { get; set; }
 
     public override string ToString() => $"{DispId}: {Info?.Name} ({Info?.MemberType}) [{Category}]";

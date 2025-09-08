@@ -55,7 +55,7 @@ public unsafe class Aggregable
         var cls = (Aggregated*)wrapper;
 
         HRESULT hr = Marshal.QueryInterface(cls->outer, iid, out ppv);
-        TracingUtilities.Trace($"outer: 0x{cls->outer:X} hr: 0x{hr:X} iid:{iid.GetName()} ifaceUnk: 0x{ppv:X}");
+        //TracingUtilities.Trace($"outer: 0x{cls->outer:X} hr: 0x{hr:X} iid:{iid.GetName()} ifaceUnk: 0x{ppv:X}");
         // remember non served iids so we don't go infinite loop
         return hr;
     }
@@ -69,7 +69,7 @@ public unsafe class Aggregable
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvStdcall)])]
     private static HRESULT IUnknownQueryInterface(nint thisPtr, Guid* riid, nint* ppv)
     {
-        TracingUtilities.Trace($"this: 0x{thisPtr:X} riid: {(riid != null ? riid->GetName() : null)}");
+        //TracingUtilities.Trace($"this: 0x{thisPtr:X} riid: {(riid != null ? riid->GetName() : null)}");
         if (riid == null || ppv == null)
             return Constants.E_POINTER;
         *ppv = 0;
@@ -91,7 +91,7 @@ public unsafe class Aggregable
             {
                 // forward QueryInterface to inner
                 hr = Marshal.QueryInterface(cls->inner, iid, out var ifaceUnk);
-                TracingUtilities.Trace($"inner: 0x{cls->inner:X} hr: 0x{hr:X} iid:{iid.GetName()} ifaceUnk: 0x{ifaceUnk:X}");
+                //TracingUtilities.Trace($"inner: 0x{cls->inner:X} hr: 0x{hr:X} iid:{iid.GetName()} ifaceUnk: 0x{ifaceUnk:X}");
                 if (hr.IsSuccess && ifaceUnk != 0)
                 {
                     *ppv = ifaceUnk;
@@ -110,7 +110,7 @@ public unsafe class Aggregable
 
         if (!_tempIidStack.TryAdd(wg, null))
         {
-            TracingUtilities.Trace($"outer: 0x{cls->outer:X} iid:{iid.GetName()} already in stack");
+            //TracingUtilities.Trace($"outer: 0x{cls->outer:X} iid:{iid.GetName()} already in stack");
             return Constants.E_NOINTERFACE;
         }
 
@@ -132,7 +132,7 @@ public unsafe class Aggregable
     {
         var unk = (Aggregated*)thisPtr;
         var ui = (uint)Interlocked.Increment(ref unk->refCount);
-        TracingUtilities.Trace($"this: 0x{thisPtr:X} refCount: {-1 + unk->refCount} => {unk->refCount}");
+        //TracingUtilities.Trace($"this: 0x{thisPtr:X} refCount: {-1 + unk->refCount} => {unk->refCount}");
         return ui;
     }
 
@@ -141,7 +141,7 @@ public unsafe class Aggregable
     {
         var unk = (Aggregated*)thisPtr;
         var c = Interlocked.Decrement(ref unk->refCount);
-        TracingUtilities.Trace($"this: 0x{thisPtr:X} refCount: {1 + unk->refCount} => {unk->refCount}");
+        //TracingUtilities.Trace($"this: 0x{thisPtr:X} refCount: {1 + unk->refCount} => {unk->refCount}");
         if (c == 0)
         {
             Marshal.FreeCoTaskMem((nint)unk->aggregableInterfaceIids);

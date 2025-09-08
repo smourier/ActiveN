@@ -1744,7 +1744,7 @@ public abstract partial class BaseControl : BaseDispatch,
 
     HRESULT IPerPropertyBrowsing.MapPropertyToPage(int dispId, out Guid pClsid)
     {
-        var clsid = DefaultPropertyPageId;
+        var clsid = Guid.Empty;
         var hr = TracingUtilities.WrapErrors(() =>
         {
             var id = MapPropertyToPage(dispId);
@@ -1754,6 +1754,14 @@ public abstract partial class BaseControl : BaseDispatch,
                 clsid = id.Value;
                 return Constants.S_OK;
             }
+
+            var first = PropertyPagesIds.FirstOrDefault();
+            if (first != Guid.Empty)
+            {
+                clsid = first;
+                return Constants.S_OK;
+            }
+
             return Constants.PERPROP_E_NOPAGEAVAILABLE;
         });
         pClsid = clsid;
