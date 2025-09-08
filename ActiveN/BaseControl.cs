@@ -136,7 +136,7 @@ public abstract partial class BaseControl : BaseDispatch,
 
     protected override void OnStockPropertyChanged(int dispId)
     {
-        TracingUtilities.Trace($"dispId: {dispId} FreezeCount: {FreezeCount}");
+        TracingUtilities.Trace($"dispId: {(DISPID)dispId} FreezeCount: {FreezeCount}");
         base.OnStockPropertyChanged(dispId);
         if (FreezeCount == 0 && !FireOnRequestEdit(dispId))
         {
@@ -236,13 +236,13 @@ public abstract partial class BaseControl : BaseDispatch,
         var hr = disp.Object.Invoke(dispid, Guid.Empty, 0, DISPATCH_FLAGS.DISPATCH_PROPERTYGET, p, (nint)(&v), 0, 0);
         if (hr.IsError)
         {
-            TracingUtilities.Trace($"dispid: {dispid} hr: {hr}");
+            TracingUtilities.Trace($"dispid: {(DISPID)dispid} hr: {hr}");
             return false;
         }
 
         using var variant = Variant.Attach(ref v);
         value = variant.Value;
-        TracingUtilities.Trace($"dispid: {dispid} value: {value}");
+        TracingUtilities.Trace($"dispid: {(DISPID)dispid} value: {value}");
         return true;
     }
 
@@ -285,15 +285,7 @@ public abstract partial class BaseControl : BaseDispatch,
 
     protected virtual void SendOnDataChanged(ADVF advf = 0)
     {
-        var dataObjectPtr = DirectN.Extensions.Com.ComObject.GetOrCreateComInstance<IDataObject>(this);
-        if (dataObjectPtr == 0)
-            return;
-
-        using var dataObject = DirectN.Extensions.Com.ComObject.FromPointer<IDataObject>(dataObjectPtr)!;
-        if (dataObject == null)
-            return;
-
-        _dataAdviseHolder?.Object.SendOnDataChange(dataObject.Object, 0, (uint)advf);
+        _dataAdviseHolder?.Object.SendOnDataChange(this, 0, (uint)advf);
     }
 
     protected virtual void OnControlInfoChanged()
@@ -538,7 +530,7 @@ public abstract partial class BaseControl : BaseDispatch,
 
         if (State != ControlState.InplaceActive && State != ControlState.UIActive && iid == typeof(IOleInPlaceObject).GUID)
         {
-            TracingUtilities.Trace($"iid: {iid.GetName()} not allowed in inplace or UI active state. Current state: {State}");
+            TracingUtilities.Trace($"error: iid: {iid.GetName()} not allowed in inplace or UI active state. Current state: {State}");
             return CustomQueryInterfaceResult.Failed;
         }
 
@@ -1160,7 +1152,7 @@ public abstract partial class BaseControl : BaseDispatch,
     HRESULT IOleControl.OnAmbientPropertyChange(int dispId) => TracingUtilities.WrapErrors(() =>
     {
         var dispid = (DISPID)dispId;
-        TracingUtilities.Trace($"dispID: {dispid}");
+        TracingUtilities.Trace($"dispID: {(DISPID)dispid}");
         OnAmbientPropertyChanged(dispid);
         return Constants.S_OK;
     });
@@ -1719,7 +1711,7 @@ public abstract partial class BaseControl : BaseDispatch,
         var hr = TracingUtilities.WrapErrors(() =>
         {
             var name = GetDisplayString(dispId);
-            TracingUtilities.Trace($"dispId: {dispId} (0x:{dispId:X}) name: '{name}'");
+            TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x:{dispId:X}) name: '{name}'");
             if (name != null)
             {
                 bstr = new BSTR(Marshal.StringToBSTR(name));
@@ -1737,7 +1729,7 @@ public abstract partial class BaseControl : BaseDispatch,
         var hr = TracingUtilities.WrapErrors(() =>
         {
             var id = MapPropertyToPage(dispId);
-            TracingUtilities.Trace($"dispId: {dispId} (0x:{dispId:X}) clsid: {id}");
+            TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x:{dispId:X}) clsid: {id}");
             if (id != null)
             {
                 clsid = id.Value;
@@ -1793,7 +1785,7 @@ public abstract partial class BaseControl : BaseDispatch,
                     hr = Constants.S_OK;
                 }
             }
-            TracingUtilities.Trace($"dispId: {dispId} (0x:{dispId:X}) strings: {strElemsCount} cookies: {cookiesElemsCount}");
+            TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x:{dispId:X}) strings: {strElemsCount} cookies: {cookiesElemsCount}");
             return hr;
         });
 
@@ -1812,7 +1804,7 @@ public abstract partial class BaseControl : BaseDispatch,
 
     HRESULT IPerPropertyBrowsing.GetPredefinedValue(int dispId, uint dwCookie, out VARIANT pVarOut)
     {
-        TracingUtilities.Trace($"dispId: {dispId} (0x:{dispId:X}) dwCookie: {dwCookie}");
+        TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x:{dispId:X}) dwCookie: {dwCookie}");
         var variant = new VARIANT();
         var hr = TracingUtilities.WrapErrors(() =>
         {

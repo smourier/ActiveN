@@ -1,4 +1,5 @@
-﻿namespace ActiveN.Samples.PdfView;
+﻿
+namespace ActiveN.Samples.PdfView;
 
 // TODO: generate another GUID, change ProgId and DisplayName
 // This GUID *must* match the one in the corresponding .idl coclass
@@ -60,6 +61,24 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
         Interlocked.Exchange(ref _drawIcon, null)?.Dispose();
     }
 
+    protected override void SetStockProperty(object? value, [CallerMemberName] string? name = null)
+    {
+        base.SetStockProperty(value, name);
+        if (Window != null)
+        {
+            switch (name)
+            {
+                case nameof(BackColor):
+                    Window.BackgroundColor = BackColor;
+                    break;
+
+                case nameof(ShowControls):
+                    Window.ShowControls = ShowControls;
+                    break;
+            }
+        }
+    }
+
     protected override void Draw(HDC hdc, RECT bounds)
     {
         if (hdc == 0)
@@ -75,6 +94,7 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
         if (_drawIcon != null)
         {
             TracingUtilities.Trace($"Drawing icon (size: {iconSize}) {_drawIcon.Handle} in {bounds}");
+
             var size = new SIZE(iconSize, iconSize);
             var factor = size.GetScaleFactor(bounds.Width, bounds.Height);
             var w = (int)(size.cx * factor.width);
@@ -112,13 +132,13 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
     // can match PROPCAT_XXX or be a custom string
     [Category("Appearance")]
     [PropertyPage(DefaultPropertyPageIdString)]
-    public bool ShowControls { get => Window?.ShowControls ?? true; set { if (Window != null) Window.ShowControls = value; } }
+    public bool ShowControls { get => GetStockProperty(true); set => SetStockProperty(value); }
     HRESULT IPdfViewControl.get_ShowControls(out VARIANT_BOOL value) { value = ShowControls; return Constants.S_OK; }
     HRESULT IPdfViewControl.set_ShowControls(VARIANT_BOOL value) { ShowControls = value; return Constants.S_OK; }
 
-    public D3DCOLORVALUE BackColor { get => Window?.BackgroundColor ?? D3DCOLORVALUE.White; set { if (Window != null) Window.BackgroundColor = value; } }
-    HRESULT IPdfViewControl.get_BackColor(out uint value) { value = BackColor.UInt32Value; return Constants.S_OK; }
-    HRESULT IPdfViewControl.set_BackColor(uint value) { BackColor = new D3DCOLORVALUE(value); return Constants.S_OK; }
+    public OLE_COLOR BackColor { get => GetStockProperty<OLE_COLOR>(PdfViewWindow.DefaultBackgroundColor); set => SetStockProperty(value); }
+    HRESULT IPdfViewControl.get_BackColor(out OLE_COLOR value) { value = BackColor; return Constants.S_OK; }
+    HRESULT IPdfViewControl.set_BackColor(OLE_COLOR value) { BackColor = value; return Constants.S_OK; }
 
     public HWND HWND => GetWindowHandle();
     HRESULT IPdfViewControl.get_HWND(out nint value) { value = HWND; return Constants.S_OK; }

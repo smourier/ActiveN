@@ -191,7 +191,7 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
             {
                 rgDispId[i] = -1;
             }
-            TracingUtilities.Trace($"name '{name}' => {rgDispId[i]} (0x{rgDispId[i]:X8})");
+            TracingUtilities.Trace($"name '{name}' => {(DISPID)rgDispId[i]} (0x{rgDispId[i]:X8})");
         }
 
         if (rgDispId.Any(id => id == -1))
@@ -273,14 +273,14 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
     {
         try
         {
-            TracingUtilities.Trace($"dispIdMember: {dispIdMember} (0x{dispIdMember:X8}) wFlags: {wFlags} cArgs: {pDispParams.cArgs} pVarResult: {pVarResult} pExcepInfo: {pExcepInfo} puArgErr: {puArgErr}");
+            TracingUtilities.Trace($"dispIdMember: {(DISPID)dispIdMember} (0x{dispIdMember:X8} wFlags: {wFlags} cArgs: {pDispParams.cArgs} pVarResult: {pVarResult} pExcepInfo: {pExcepInfo} puArgErr: {puArgErr}");
             var dispatchType = GetDispatchType();
 
             var member = dispatchType.GetMemberInfo(dispIdMember);
             // note we can return DISP_E_MEMBERNOTFOUND for a method/property that exists in the TLB but not in the actual type
             if (member == null)
             {
-                TracingUtilities.Trace($"dispIdMember: {dispIdMember} was not found => DISP_E_MEMBERNOTFOUND.");
+                TracingUtilities.Trace($"dispIdMember: {(DISPID)dispIdMember} was not found => DISP_E_MEMBERNOTFOUND.");
                 return Constants.DISP_E_MEMBERNOTFOUND;
             }
 

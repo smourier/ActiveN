@@ -2,6 +2,8 @@
 
 public class PdfViewWindow : Window
 {
+    public static readonly D3DCOLORVALUE DefaultBackgroundColor = D3DCOLORVALUE.White;
+
     private const int _buttonsHeight = 24;
     private const int _buttonsPadding = 10;
     private const int _buttonsWidth = 100;
@@ -14,7 +16,7 @@ public class PdfViewWindow : Window
     private HWND _previousButton;
     private HWND _nextButton;
     private bool _showControls = true;
-    private D3DCOLORVALUE _backgroundColor = D3DCOLORVALUE.White;
+    private D3DCOLORVALUE _backgroundColor = DefaultBackgroundColor;
 
     public event EventHandler? FileOpened;
     public event EventHandler? FileClosed;
