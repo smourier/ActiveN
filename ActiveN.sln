@@ -4,6 +4,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.14.36414.22
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActiveN", "ActiveN\ActiveN.csproj", "{0F629F38-7099-40E0-99D3-5BB34C693C45}"
+	ProjectSection(ProjectDependencies) = postProject
+		{E1B1040B-D25F-AFAE-298A-849E8DAE0251} = {E1B1040B-D25F-AFAE-298A-849E8DAE0251}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActiveN.Samples.HelloWorld", "ActiveN.Samples.HelloWorld\ActiveN.Samples.HelloWorld.csproj", "{159340C0-ABFA-4296-9F23-4C7292E77387}"
 EndProject
@@ -16,6 +19,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleComObject.VBscript", "Tests\SimpleComObject.VBscript\SimpleComObject.VBscript.csproj", "{0949675E-2EE9-2A3C-880B-C4EA5CEEC3C6}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PdfView.VBscript", "Tests\PdfView.VBscript\PdfView.VBscript.csproj", "{11D22532-3B01-549B-C845-D6CD6AB20A4C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActiveN.PropertyGrid", "ActiveN.PropertyGrid\ActiveN.PropertyGrid.csproj", "{E1B1040B-D25F-AFAE-298A-849E8DAE0251}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -93,6 +98,18 @@ Global
 		{11D22532-3B01-549B-C845-D6CD6AB20A4C}.Release|x64.Build.0 = Release|Any CPU
 		{11D22532-3B01-549B-C845-D6CD6AB20A4C}.Release|x86.ActiveCfg = Release|Any CPU
 		{11D22532-3B01-549B-C845-D6CD6AB20A4C}.Release|x86.Build.0 = Release|Any CPU
+		{E1B1040B-D25F-AFAE-298A-849E8DAE0251}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{E1B1040B-D25F-AFAE-298A-849E8DAE0251}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{E1B1040B-D25F-AFAE-298A-849E8DAE0251}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E1B1040B-D25F-AFAE-298A-849E8DAE0251}.Debug|x64.Build.0 = Debug|Any CPU
+		{E1B1040B-D25F-AFAE-298A-849E8DAE0251}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E1B1040B-D25F-AFAE-298A-849E8DAE0251}.Debug|x86.Build.0 = Debug|Any CPU
+		{E1B1040B-D25F-AFAE-298A-849E8DAE0251}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{E1B1040B-D25F-AFAE-298A-849E8DAE0251}.Release|ARM64.Build.0 = Release|Any CPU
+		{E1B1040B-D25F-AFAE-298A-849E8DAE0251}.Release|x64.ActiveCfg = Release|Any CPU
+		{E1B1040B-D25F-AFAE-298A-849E8DAE0251}.Release|x64.Build.0 = Release|Any CPU
+		{E1B1040B-D25F-AFAE-298A-849E8DAE0251}.Release|x86.ActiveCfg = Release|Any CPU
+		{E1B1040B-D25F-AFAE-298A-849E8DAE0251}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

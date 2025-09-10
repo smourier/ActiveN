@@ -15,9 +15,7 @@ public static class TracingUtilities
 
     // office's VBA asks for this
     [Guid("C62A69F0-16DC-11CE-9E98-00AA00574A4F")]
-#pragma warning disable IDE1006 // Naming Styles
     private partial interface IForms20Form { }
-#pragma warning restore IDE1006 // Naming Styles
 
     // write all traces on a single thread to avoid garbling the output
     private static int _threadId;

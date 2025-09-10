@@ -27,7 +27,6 @@ public abstract partial class BaseControl : BaseDispatch,
     ISupportErrorInfo,
     IConnectionPointContainer,
     ISpecifyPropertyPages,
-    ICategorizeProperties,
     IRunnableObject,
     IAggregable
 {
@@ -1694,33 +1693,6 @@ public abstract partial class BaseControl : BaseDispatch,
             return Constants.S_OK;
         });
         pPages = pages;
-        return hr;
-    }
-
-    HRESULT ICategorizeProperties.MapPropertyToCategory(DISPID dispId, out PROPCAT ppropcat)
-    {
-        var propcat = PROPCAT.PROPCAT_Misc;
-        var hr = TracingUtilities.WrapErrors(() =>
-        {
-            propcat = MapPropertyToCategory((int)dispId);
-            TracingUtilities.Trace($"dispId: {dispId} (0x:{dispId:X}) cat: {propcat}");
-            return Constants.S_OK;
-        });
-        ppropcat = propcat;
-        return hr;
-    }
-
-    HRESULT ICategorizeProperties.GetCategoryName(PROPCAT propcat, uint lcid, out BSTR pbstrName)
-    {
-        var bstr = BSTR.Null;
-        var hr = TracingUtilities.WrapErrors(() =>
-        {
-            var name = GetCategoryName(propcat, lcid);
-            bstr = new BSTR(Marshal.StringToBSTR(name));
-            TracingUtilities.Trace($"propcat: {propcat} lcid: {lcid} name: '{name}'");
-            return Constants.S_OK;
-        });
-        pbstrName = bstr;
         return hr;
     }
 

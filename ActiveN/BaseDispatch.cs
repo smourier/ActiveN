@@ -1,7 +1,11 @@
 ﻿namespace ActiveN;
 
 [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)]
-public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface, INotifyPropertyChanged
+[GeneratedComClass]
+public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
+    IPropertyGridObject,
+    ICategorizeProperties,
+    INotifyPropertyChanged
 {
     private static readonly ConcurrentDictionary<Type, DispatchType> _cache = new();
 
@@ -528,6 +532,39 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
         var type = GetDispatchType();
         var member = type.GetMember(dispId);
         return member?.PropertyPageId;
+    }
+
+    HRESULT IPropertyGridObject.GetProperties(out VARIANT properties)
+    {
+        var pgObj = new PropertyGridObject(GetType(), this);
+        return ((IPropertyGridObject)pgObj).GetProperties(out properties);
+    }
+
+    HRESULT ICategorizeProperties.MapPropertyToCategory(DISPID dispId, out PROPCAT ppropcat)
+    {
+        var propcat = PROPCAT.PROPCAT_Misc;
+        var hr = TracingUtilities.WrapErrors(() =>
+        {
+            propcat = MapPropertyToCategory((int)dispId);
+            TracingUtilities.Trace($"dispId: {dispId} (0x:{dispId:X}) cat: {propcat}");
+            return Constants.S_OK;
+        });
+        ppropcat = propcat;
+        return hr;
+    }
+
+    HRESULT ICategorizeProperties.GetCategoryName(PROPCAT propcat, uint lcid, out BSTR pbstrName)
+    {
+        var bstr = BSTR.Null;
+        var hr = TracingUtilities.WrapErrors(() =>
+        {
+            var name = GetCategoryName(propcat, lcid);
+            bstr = new BSTR(Marshal.StringToBSTR(name));
+            TracingUtilities.Trace($"propcat: {propcat} lcid: {lcid} name: '{name}'");
+            return Constants.S_OK;
+        });
+        pbstrName = bstr;
+        return hr;
     }
 
     public class PredefinedString(uint id, string name)

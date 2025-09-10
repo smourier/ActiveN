@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFrameworks>net48</TargetFrameworks>
+		<UseWindowsForms>true</UseWindowsForms>
+		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+		<LangVersion>default</LangVersion>
+		<Nullable>enable</Nullable>
+		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <Compile Include="..\ActiveN\Properties\AssemblyVersionInfo.cs" Link="Properties\AssemblyVersionInfo.cs" />
+	  <Compile Include="..\ActiveN\Utilities\IPropertyGridObject.cs" Link="IPropertyGridObject.cs" />
+	  <Compile Include="..\ActiveN\Utilities\IPropertyGridProperty.cs" Link="IPropertyGridProperty.cs" />
+	  <Compile Include="..\ActiveN\Utilities\PropertyGridPropertyOptions.cs" Link="PropertyGridPropertyOptions.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Reference Include="Microsoft.CSharp" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Using Include="ActiveN" />
+		<Using Include="ActiveN.PropertyGrid" />
+		<Using Include="ActiveN.Utilities" />
+		<Using Include="System" />
+		<Using Include="System.Collections.Generic" />
+		<Using Include="System.ComponentModel" />
+		<Using Include="System.IO" />
+		<Using Include="System.Reflection" />
+		<Using Include="System.Runtime.CompilerServices" />
+		<Using Include="System.Windows.Forms" />
+		<Using Include="System.Runtime.InteropServices" />
+		<Using Include="System.Threading" />
+		<Using Alias="HRESULT" Include="System.Int32" />
+		<Using Alias="VARIANT" Include="System.Object" />
+		<Using Alias="PWSTR" Include="System.String" />
+	</ItemGroup>
+
+</Project>

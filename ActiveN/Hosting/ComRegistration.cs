@@ -20,6 +20,7 @@ public abstract partial class ComRegistration
         var assemblies = new HashSet<Assembly>
         {
             typeof(IUnknown).Assembly, // DirectN
+            typeof(Window).Assembly, // DirectN.Extensions
             Assembly.GetExecutingAssembly(),
         };
 
