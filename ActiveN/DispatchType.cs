@@ -174,6 +174,7 @@ public class DispatchType([DynamicallyAccessedMembers(DynamicallyAccessedMemberT
 
             var category = GetCategory(property);
             var member = CreateMember(dispid, category, property) ?? throw new InvalidOperationException();
+            member.IsReadOnly = !property.CanWrite || property.GetCustomAttribute<ReadOnlyAttribute>()?.IsReadOnly == true;
 
             var page = property?.GetCustomAttribute<PropertyPageAttribute>();
             if (page != null)

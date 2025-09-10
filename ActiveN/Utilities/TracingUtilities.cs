@@ -2,11 +2,23 @@
 
 public static class TracingUtilities
 {
-    // for tracing only
+    // .NET Framework IIDs
     [Guid("9a604ee7-e630-3ded-9444-baae247075ab")]
     private partial interface IFormattable { }
 
-    // office's VBA asks for this
+    [Guid("b86e59f2-f1e2-389d-b5f1-c55307c8106e")]
+    private partial interface IComponent { }
+
+    [Guid("463bf9aa-d192-387e-80c6-6d659869df97")]
+    private partial interface ICustomTypeDescriptor { }
+
+    [Guid("18bfa90e-8d34-3498-a682-f888a57259eb")]
+    private partial interface ICustomTypeDescriptorUnimplemented { }
+
+    [Guid("37b1ce8d-fe09-3007-86a1-e089298c718c")]
+    private partial interface IPropertyGridUnimplemented { }
+
+    // Office's VBA asks for these
     [Guid("049948d1-5686-11cf-8e0d-00aa00a74c5c")]
     private partial interface IPersistHTML { }
 
@@ -14,7 +26,6 @@ public static class TracingUtilities
     private partial interface IOfficeSafetyRelated { }
 
     // office's VBA asks for this
-    [Guid("C62A69F0-16DC-11CE-9E98-00AA00574A4F")]
     private partial interface IForms20Form { }
 
     // write all traces on a single thread to avoid garbling the output

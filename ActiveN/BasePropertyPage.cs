@@ -25,7 +25,7 @@ public abstract partial class BasePropertyPage : ICustomQueryInterface, IDisposa
         if (_objects.Count == 0)
             return;
 
-        var obj = DirectN.Extensions.Com.ComObject.FromPointer<IPropertyGridObject>(_objects[0]);
+        var obj = DirectN.Extensions.Com.ComObject.FromPointer<IDispatch>(_objects[0]);
         if (obj == null)
             return;
 

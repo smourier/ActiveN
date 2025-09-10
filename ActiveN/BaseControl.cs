@@ -583,8 +583,6 @@ public abstract partial class BaseControl : BaseDispatch,
     protected override CustomQueryInterfaceResult GetInterface(ref Guid iid, out nint ppv)
     {
         ppv = 0;
-        TracingUtilities.Trace($"iid: {iid.GetName()}");
-
         if (State != ControlState.InplaceActive && State != ControlState.UIActive && iid == typeof(IOleInPlaceObject).GUID)
         {
             TracingUtilities.Trace($"error: iid: {iid.GetName()} not allowed in inplace or UI active state. Current state: {State}");
@@ -604,6 +602,7 @@ public abstract partial class BaseControl : BaseDispatch,
             TracingUtilities.Trace($"iid: {iid.GetName()} wrapper was not set");
         }
 
+        TracingUtilities.Trace($"iid: {iid.GetName()}");
         return CustomQueryInterfaceResult.NotHandled;
     }
 

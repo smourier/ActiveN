@@ -179,10 +179,7 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
 
     public PdfViewPage GetPage(int pageNumber)
     {
-        var window = Window;
-        if (window == null)
-            throw new Exception("No file was opened.");
-
+        var window = Window ?? throw new Exception("No file was opened.");
         if (window.PdfDocument == null)
             throw new Exception("No document was opened.");
 

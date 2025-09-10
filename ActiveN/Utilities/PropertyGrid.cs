@@ -8,11 +8,15 @@ public class PropertyGrid
     public const string TypeName = AssemblyName + ".PropertiesForm";
     public const string MethodName = "Show";
 
-    public static string EnsureNetFxPropertyGridFiles()
+    private static bool _netFxPropertyGridFilesEnsured;
+    public static string EnsureNetFxPropertyGridFiles(bool force = false)
     {
         var fileVersion = Assembly.GetExecutingAssembly().GetFileVersion();
-        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream($"{typeof(PropertyGrid).Namespace}.{AssemblyName}.dll") ?? throw new InvalidOperationException();
         var path = Path.Combine(Path.GetTempPath(), $"ActiveN{fileVersion}", $"{AssemblyName}.dll");
+        if (_netFxPropertyGridFilesEnsured && !force)
+            return path;
+
+        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream($"{typeof(PropertyGrid).Namespace}.{AssemblyName}.dll") ?? throw new InvalidOperationException();
         TracingUtilities.Trace($"Ensuring {path}");
 
         var needsCopy = !File.Exists(path) || new FileInfo(path).Length != stream.Length;
@@ -77,6 +81,8 @@ public class PropertyGrid
                 });
             }
         }
+
+        _netFxPropertyGridFilesEnsured = File.Exists(path) && new FileInfo(path).Length == stream.Length;
         return path;
     }
 
@@ -87,10 +93,15 @@ public class PropertyGrid
         {
             foreach (var rt in host.EnumerateLoadedRuntimes(Process.GetCurrentProcess()))
             {
-                TracingUtilities.Trace($"Found loaded runtime: {rt.Version}");
+                TracingUtilities.Trace($"Found loaded runtime: {rt.Version} started: {rt.IsStarted}");
                 if (rt.Version?.StartsWith("v4") == true)
                 {
                     var rth = rt.GetHost();
+                    if (rt.IsStarted == null)
+                    {
+                        rth.Start();
+                    }
+
                     rt.Dispose();
                     return rth;
                 }
@@ -113,7 +124,7 @@ public class PropertyGrid
         return null;
     }
 
-    public static HRESULT Show(IComObject<IPropertyGridObject> obj, bool throwOnError = true)
+    public static HRESULT Show(object obj, bool throwOnError = true)
     {
         ArgumentNullException.ThrowIfNull(obj);
         var path = EnsureNetFxPropertyGridFiles();
@@ -129,7 +140,7 @@ public class PropertyGrid
         spm.Object.CreatePropertyGroup(groupName, ref isoMode, ref releaseModes, out var gexists, out var spgObj).ThrowOnError(throwOnError);
         using var spg = new ComObject<ISharedPropertyGroup>(spgObj);
 
-        using var propertyName = new Bstr(typeof(IPropertyGridObject).GUID.ToString());
+        using var propertyName = new Bstr("SelectedObject");
         spg.Object.CreateProperty(propertyName, out var pexists, out var propObj).ThrowOnError(throwOnError);
         using var prop = new ComObject<ISharedProperty>(propObj);
 
