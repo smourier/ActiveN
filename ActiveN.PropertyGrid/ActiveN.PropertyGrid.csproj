@@ -10,6 +10,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <Compile Include="..\ActiveN\GlobalSuppressions.cs" Link="GlobalSuppressions.cs" />
 	  <Compile Include="..\ActiveN\Properties\AssemblyVersionInfo.cs" Link="Properties\AssemblyVersionInfo.cs" />
 	</ItemGroup>
 
@@ -23,6 +24,7 @@
 		<Using Include="System" />
 		<Using Include="System.Collections.Generic" />
 		<Using Include="System.ComponentModel" />
+		<Using Include="System.Diagnostics.CodeAnalysis" />
 		<Using Include="System.IO" />
 		<Using Include="System.Reflection" />
 		<Using Include="System.Runtime.CompilerServices" />

@@ -622,11 +622,18 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
         return Constants.S_OK;
     }
 
-    HRESULT IVsPerPropertyBrowsing.GetLocalizedPropertyInfo(int dispId, uint localeID, out BSTR pbstrLocalizedName, out BSTR pbstrLocalizeDescription)
+    unsafe HRESULT IVsPerPropertyBrowsing.GetLocalizedPropertyInfo(int dispId, uint localeID, nint pbstrLocalizedName, nint pbstrLocalizeDescription)
     {
-        TracingUtilities.Trace($"dispId: {dispId} localeID: {localeID}");
-        pbstrLocalizedName = BSTR.Null;
-        pbstrLocalizeDescription = BSTR.Null;
+        TracingUtilities.Trace($"dispId: {dispId} localeID: {localeID} pbstrLocalizedName: {pbstrLocalizedName} pbstrLocalizeDescription: {pbstrLocalizeDescription}");
+        if (pbstrLocalizeDescription != 0)
+        {
+            *(BSTR*)pbstrLocalizeDescription = BSTR.Null;
+        }
+
+        if (pbstrLocalizedName != 0)
+        {
+            *(BSTR*)pbstrLocalizedName = BSTR.Null;
+        }
         return Constants.S_OK;
     }
 

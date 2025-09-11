@@ -1,7 +1,9 @@
 ﻿namespace ActiveN.Utilities;
 
-// Winforms .NET Core is not yet AOT-capable, we cannot use its PropertyGrid yet.
-// So we use .NET Framework's PropertyGrid for now.
+// Winforms .NET Core is not yet AOT-capable, we cannot use its PropertyGrid yet, so we use .NET Framework's PropertyGrid for now
+// since it's always installed and doesn't require any additional dependencies.
+// Note that if the process is a .NET Framework process, it's possible that the .NET Core Windows Forms will be loaded automatically instead of .NET Framework's.
+// In this case, custom attributes like [Category("blah")] will not work as expected because .NET Core's property grid will mix things up.
 public class PropertyGrid
 {
     public const string AssemblyName = "ActiveN.PropertyGrid";
@@ -97,6 +99,7 @@ public class PropertyGrid
                 if (rt.Version?.StartsWith("v4") == true)
                 {
                     var rth = rt.GetHost();
+                    TracingUtilities.Trace($" host status: {rt.IsStarted}");
                     if (rt.IsStarted == null)
                     {
                         rth.Start();
@@ -115,7 +118,11 @@ public class PropertyGrid
             if (rt.Version?.StartsWith("v4") == true)
             {
                 var rth = rt.GetHost();
-                rth.Start();
+                TracingUtilities.Trace($" host status: {rt.IsStarted}");
+                if (rt.IsStarted == null)
+                {
+                    rth.Start();
+                }
                 rt.Dispose();
                 return rth;
             }
@@ -124,7 +131,7 @@ public class PropertyGrid
         return null;
     }
 
-    public static HRESULT Show(object obj, bool throwOnError = true)
+    public static HRESULT Show(HWND parent, RECT rect, object obj, bool throwOnError = true)
     {
         ArgumentNullException.ThrowIfNull(obj);
         var path = EnsureNetFxPropertyGridFiles();
@@ -149,7 +156,7 @@ public class PropertyGrid
             using var v = new Variant(unk, VARENUM.VT_UNKNOWN);
             prop.Object.put_Value(v.Detached).ThrowOnError(throwOnError);
 
-            HRESULT hr = host.ExecuteInDefaultAppDomain(path, TypeName, MethodName, string.Empty);
+            HRESULT hr = host.ExecuteInDefaultAppDomain(path, TypeName, MethodName, $"parent:{parent.Value}|rect:{rect}");
             hr.ThrowOnError(throwOnError);
             return hr;
         });

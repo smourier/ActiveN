@@ -20,7 +20,7 @@ public abstract partial class BasePropertyPage : ICustomQueryInterface, IDisposa
         _site?.Object?.OnStatusChange(status);
     }
 
-    protected virtual void Activate(HWND parent, RECT rect, bool model)
+    protected virtual void Activate(HWND parent, RECT rect, bool modal)
     {
         if (_objects.Count == 0)
             return;
@@ -31,7 +31,7 @@ public abstract partial class BasePropertyPage : ICustomQueryInterface, IDisposa
 
         // this may be an outer from aggregation, so we must QI for the real object
         TracingUtilities.Trace($" object[0]: {obj.Object}");
-        PropertyGrid.Show(obj);
+        PropertyGrid.Show(parent, rect, obj);
     }
 
     protected virtual void DisposeObjects()
