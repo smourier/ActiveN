@@ -13,26 +13,26 @@ public static class TracingUtilities
     private partial interface ICustomTypeDescriptor { }
 
     [Guid("b0dfdf9c-2408-3ec9-abf4-46203d96af67")]
-    private partial interface IObject { } // not sure what is this one
+    private partial interface IFxObject { } // not sure what is this one, name is from me
 
     [Guid("bb7c132b-b737-374c-bdad-9d2c344bcee5")]
     private partial interface IManagedWrapper { }
 
     [Guid("18bfa90e-8d34-3498-a682-f888a57259eb")]
-    private partial interface ICustomTypeDescriptorUnimplemented { }
+    private partial interface ICustomTypeDescriptorUnimplemented { } // name is ICustomTypeDescriptor+IUnimplemented
 
     [Guid("37b1ce8d-fe09-3007-86a1-e089298c718c")]
-    private partial interface IPropertyGridUnimplemented { }
+    private partial interface IPropertyGridUnimplemented { } // name IPropertyGrid+IUnimplemented 
 
     // Office's VBA asks for these
     [Guid("049948d1-5686-11cf-8e0d-00aa00a74c5c")]
     private partial interface IPersistHTML { }
 
     [Guid("e19c7100-9709-4db7-9373-e7b518b47086")]
-    private partial interface IOfficeSafetyRelated { }
+    private partial interface IOfficeSafetyRelated { } // not sure what is this one, name is from me
 
     // office's VBA asks for this
-    private partial interface IForms20Form { }
+    private partial interface IForms20Form { } // not sure what is this one, name is from me
 
     // write all traces on a single thread to avoid garbling the output
     private static int _threadId;

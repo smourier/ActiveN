@@ -664,11 +664,26 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
         return Constants.S_OK;
     }
 
-    HRESULT IVsPerPropertyBrowsing.ResetPropertyValue(int dispId)
+    HRESULT IVsPerPropertyBrowsing.ResetPropertyValue(int dispId) => TracingUtilities.WrapErrors(() =>
     {
         TracingUtilities.Trace($"dispId: {dispId}");
-        throw new NotImplementedException();
-    }
+        var type = GetDispatchType();
+        var member = type.GetMember(dispId);
+        if (member == null)
+            return Constants.E_NOTIMPL;
+
+        var prop = member.Info as PropertyInfo;
+        if (prop == null)
+            return Constants.E_NOTIMPL;
+
+        var canReset = member.DefaultString != null;
+        if (!canReset)
+            return Constants.E_NOTIMPL;
+
+        var value = member.GetDefaultValue();
+        prop.SetValue(this, value);
+        return Constants.S_OK;
+    });
 
     unsafe HRESULT IVSMDPerPropertyBrowsing.GetPropertyAttributes(int dispId, out uint pceltAttrs, out nint ppbstrTypeNames, out nint ppvarAttrValues)
     {
