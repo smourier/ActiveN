@@ -31,6 +31,7 @@ public partial class SimpleComObject : BaseDispatch, ISimple, ISimpleDual
 
     #region Mandatory overrides
     protected override ComRegistration ComRegistration => ComHosting.Instance;
+    protected override Guid DispatchInterfaceId => typeof(ISimpleDual).GUID;
     #endregion
 
     #region IDispatch support

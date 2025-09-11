@@ -15,7 +15,6 @@ public abstract partial class BaseControl : BaseDispatch,
     IOleInPlaceObjectWindowless,
     IQuickActivate,
     DirectN.IServiceProvider,
-    IProvideClassInfo,
     IProvideClassInfo2,
     IPersist,
     IPersistStreamInit,
@@ -945,20 +944,6 @@ public abstract partial class BaseControl : BaseDispatch,
             return Constants.S_OK;
         });
         pdwStatus = status;
-        return hr;
-    }
-
-    HRESULT IProvideClassInfo.GetClassInfo(out ITypeInfo ppTI)
-    {
-        ITypeInfo? pti = null;
-        var hr = TracingUtilities.WrapErrors(() =>
-        {
-            var ti = EnsureTypeInfo();
-            pti = ti?.Object;
-            TracingUtilities.Trace($"ppTI: {pti}");
-            return pti != null ? Constants.S_OK : Constants.E_UNEXPECTED;
-        });
-        ppTI = pti!;
         return hr;
     }
 

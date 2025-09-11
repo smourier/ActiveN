@@ -3,6 +3,7 @@
 [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)]
 [GeneratedComClass]
 public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
+    IProvideClassInfo,
     IVsPerPropertyBrowsing,
     IVSMDPerPropertyBrowsing,
     IProvidePropertyBuilder,
@@ -12,15 +13,22 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
     private static readonly ConcurrentDictionary<Type, DispatchType> _cache = new();
 
     private ComObject<ITypeInfo>? _typeInfo;
-    private bool _typeInfoLoaded;
+    private ComObject<ITypeInfo>? _dispatchInterfaceInfo;
+    private bool _typeInfosLoaded;
     private bool _disposedValue;
 
     public event PropertyChangedEventHandler? PropertyChanged; // stock property change notifications
 
     public bool IsDisposed => _disposedValue;
-
     protected virtual IDictionary<string, object?> StockProperties { get; } = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
     public virtual Guid? PropertyPageId { get; set; }
+    protected virtual object? GetTaskResult(Task task) => null;
+    protected virtual HWND GetWindowHandle() => HWND.Null;
+    protected virtual IEnumerable<Guid> PropertyPagesIds { get; set; } = [];
+    protected abstract ComRegistration ComRegistration { get; }
+    protected abstract Guid DispatchInterfaceId { get; }
+    protected virtual IDictionary<int, IReadOnlyList<PredefinedString>> PredefinedStrings { get; set; } = new Dictionary<int, IReadOnlyList<PredefinedString>>();
+    protected virtual int AutoDispidsBase => 0x10000;
 
     protected virtual void SetStockProperty(object? value, [CallerMemberName] string? name = null)
     {
@@ -61,16 +69,7 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
         return null;
     }
 
-    protected virtual object? GetTaskResult(Task task) => null;
-    protected virtual HWND GetWindowHandle() => HWND.Null;
-    protected virtual IEnumerable<Guid> PropertyPagesIds { get; set; } = [];
-    protected abstract ComRegistration ComRegistration { get; }
-    protected virtual IDictionary<int, IReadOnlyList<PredefinedString>> PredefinedStrings { get; set; } = new Dictionary<int, IReadOnlyList<PredefinedString>>();
-
-    protected virtual int AutoDispidsBase => 0x10000;
-
     protected virtual DispatchType CreateType([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)] Type type) => new(type);
-
     protected virtual void OnStockPropertyChanged(object sender, PropertyChangedEventArgs e) => PropertyChanged?.Invoke(this, e);
     protected virtual void OnStockPropertyChanged([CallerMemberName] string? propertyName = null)
     {
@@ -111,22 +110,38 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
         return pages;
     }
 
-    protected virtual ComObject<ITypeInfo>? EnsureTypeInfo()
+    protected IComObject<ITypeInfo>? GetTypeInfo()
     {
-        if (!_typeInfoLoaded)
-        {
-            var reg = ComRegistration ?? throw new InvalidOperationException("ComRegistration is not set");
-            using var typeLib = TypeLib.LoadTypeLib(reg.DllPath, throwOnError: false);
-            TracingUtilities.Trace($"Loaded type lib for type : {GetType().GUID:B} from: {reg.DllPath} typeLib: {typeLib}");
-            if (typeLib != null)
-            {
-                var hr = typeLib.Object.GetTypeInfoOfGuid(GetType().GUID, out var ti);
-                TracingUtilities.Trace($"GetTypeInfoOfGuid: {GetType().GUID:B} hr: {hr}");
-                _typeInfo = ti != null ? new ComObject<ITypeInfo>(ti) : null;
-            }
-            _typeInfoLoaded = true;
-        }
+        EnsureTypeInfoLoaded();
         return _typeInfo;
+    }
+
+    protected IComObject<ITypeInfo>? GetDispatchInterfaceInfo()
+    {
+        EnsureTypeInfoLoaded();
+        return _dispatchInterfaceInfo;
+    }
+
+    protected virtual void EnsureTypeInfoLoaded()
+    {
+        if (_typeInfosLoaded)
+            return;
+
+        var reg = ComRegistration ?? throw new InvalidOperationException("ComRegistration is not set");
+        using var typeLib = TypeLib.LoadTypeLib(reg.DllPath, throwOnError: false);
+        TracingUtilities.Trace($"Loaded type lib for type : {GetType().GUID:B} from: {reg.DllPath} typeLib: {typeLib}");
+        if (typeLib != null)
+        {
+            var hr = typeLib.Object.GetTypeInfoOfGuid(GetType().GUID, out var ti);
+            TracingUtilities.Trace($"GetTypeInfoOfGuid: {GetType().GUID:B} hr: {hr}");
+            _typeInfo = ti != null ? new ComObject<ITypeInfo>(ti) : null;
+
+            TracingUtilities.Trace($"Loaded type lib for type : {DispatchInterfaceId:B} from: {reg.DllPath} typeLib: {typeLib}");
+            hr = typeLib.Object.GetTypeInfoOfGuid(DispatchInterfaceId, out var iti);
+            TracingUtilities.Trace($"GetTypeInfoOfGuid: {DispatchInterfaceId:B} hr: {hr}");
+            _dispatchInterfaceInfo = iti != null ? new ComObject<ITypeInfo>(iti) : null;
+        }
+        _typeInfosLoaded = true;
     }
 
     public void Dispose() { Dispose(disposing: true); GC.SuppressFinalize(this); }
@@ -138,6 +153,7 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
             {
                 // dispose managed state (managed objects)
                 _typeInfo?.Dispose();
+                _dispatchInterfaceInfo?.Dispose();
             }
 
             // free unmanaged resources (unmanaged objects) and override finalizer
@@ -155,7 +171,8 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
             // or build them using reflection
             dispatchType = CreateType(type) ?? throw new InvalidOperationException();
 
-            var ti = EnsureTypeInfo();
+            EnsureTypeInfoLoaded();
+            var ti = GetTypeInfo();
             if (ti != null)
             {
                 // add dispids for methods and properties declared in the IDL
@@ -461,10 +478,17 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
             if (iTInfo != 0)
                 return Constants.DISP_E_BADINDEX;
 
-            var tio = EnsureTypeInfo();
+            EnsureTypeInfoLoaded();
+            var tio = GetDispatchInterfaceInfo();
             if (tio != null)
             {
                 ti = tio.Object;
+                unsafe
+                {
+                    ti.GetTypeAttr(out var ta).ThrowOnError();
+                    var atts = (TYPEATTR*)ta;
+                    TracingUtilities.Trace($" funcs: {atts->cFuncs} vars: {atts->cVars}");
+                }
                 return Constants.S_OK;
             }
             return Constants.E_NOTIMPL;
@@ -478,7 +502,8 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
         var count = 0u;
         var hr = TracingUtilities.WrapErrors(() =>
         {
-            var ti = EnsureTypeInfo();
+            EnsureTypeInfoLoaded();
+            var ti = GetTypeInfo();
             count = ti != null ? 1u : 0u;
             TracingUtilities.Trace($"pctinfo {count}");
             return ti != null ? Constants.S_OK : Constants.E_NOTIMPL;
@@ -538,6 +563,21 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
         var type = GetDispatchType();
         var member = type.GetMember(dispId);
         return member?.PropertyPageId;
+    }
+
+    HRESULT IProvideClassInfo.GetClassInfo(out ITypeInfo ppTI)
+    {
+        ITypeInfo? pti = null;
+        var hr = TracingUtilities.WrapErrors(() =>
+        {
+            EnsureTypeInfoLoaded();
+            var ti = GetTypeInfo();
+            pti = ti?.Object;
+            TracingUtilities.Trace($"ppTI: {pti}");
+            return pti != null ? Constants.S_OK : Constants.E_UNEXPECTED;
+        });
+        ppTI = pti!;
+        return hr;
     }
 
     HRESULT ICategorizeProperties.MapPropertyToCategory(DISPID dispId, out PROPCAT ppropcat)

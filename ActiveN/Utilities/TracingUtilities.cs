@@ -12,6 +12,12 @@ public static class TracingUtilities
     [Guid("463bf9aa-d192-387e-80c6-6d659869df97")]
     private partial interface ICustomTypeDescriptor { }
 
+    [Guid("b0dfdf9c-2408-3ec9-abf4-46203d96af67")]
+    private partial interface IObject { } // not sure what is this one
+
+    [Guid("bb7c132b-b737-374c-bdad-9d2c344bcee5")]
+    private partial interface IManagedWrapper { }
+
     [Guid("18bfa90e-8d34-3498-a682-f888a57259eb")]
     private partial interface ICustomTypeDescriptorUnimplemented { }
 

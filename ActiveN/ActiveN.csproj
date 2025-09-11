@@ -11,10 +11,6 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<None Remove="GetWindowsSDKPaths.targets" />
-	</ItemGroup>
-
-	<ItemGroup>
 		<EmbeddedResource Include="..\ActiveN.PropertyGrid\bin\$(Configuration)\ActiveN.PropertyGrid.dll" Link="Utilities\ActiveN.PropertyGrid.dll" />
 		<EmbeddedResource Include="..\ActiveN.PropertyGrid\bin\$(Configuration)\ActiveN.PropertyGrid.pdb" Link="Utilities\ActiveN.PropertyGrid.pdb" />
 	</ItemGroup>

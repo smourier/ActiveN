@@ -55,9 +55,8 @@ public partial class PdfViewPage : BaseDispatch, IPdfViewPage
     }
 
     #region Mandatory overrides
-
     protected override ComRegistration ComRegistration => ComHosting.Instance;
-
+    protected override Guid DispatchInterfaceId => typeof(IPdfViewPage).GUID;
     #endregion
 
     #region IDispatch support

@@ -40,6 +40,7 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
 
     #region Mandatory overrides
     protected override ComRegistration ComRegistration => ComHosting.Instance;
+    protected override Guid DispatchInterfaceId => typeof(IPdfViewControl).GUID;
     protected override Window CreateWindow(HWND parentHandle, RECT rect)
     {
         var window = new PdfViewWindow(parentHandle, GetDefaultWindowStyle(parentHandle), rect);

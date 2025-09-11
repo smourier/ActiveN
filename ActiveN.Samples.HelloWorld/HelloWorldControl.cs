@@ -11,6 +11,7 @@ public partial class HelloWorldControl : BaseControl, IHelloWorldControl
 {
     #region Mandatory overrides
     protected override ComRegistration ComRegistration => ComHosting.Instance;
+    protected override Guid DispatchInterfaceId => typeof(IHelloWorldControl).GUID;
     protected override Window CreateWindow(HWND parentHandle, RECT rect) => new HelloWorldWindow(parentHandle, GetDefaultWindowStyle(parentHandle), rect);
 
     // note this is necesary to avoid trimming Task<T>.Result for AOT publishing
