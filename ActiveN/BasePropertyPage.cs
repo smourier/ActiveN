@@ -26,11 +26,11 @@ public abstract partial class BasePropertyPage : ICustomQueryInterface, IDisposa
         if (_objects.Count == 0)
             return;
 
+        // this should be an instance of BaseControl (so BaseDispatch too)
         var obj = DirectN.Extensions.Com.ComObject.FromPointer<IDispatch>(_objects[0]);
         if (obj == null)
             return;
 
-        // this may be an outer from aggregation, so we must QI for the real object
         TracingUtilities.Trace($" object[0]: {obj.Object}");
         _disposable = PropertyGrid.Show(parent, rect, obj);
     }

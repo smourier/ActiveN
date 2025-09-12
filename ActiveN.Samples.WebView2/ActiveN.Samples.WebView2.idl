@@ -1,0 +1,46 @@
+﻿#include "olectl.h"
+import "oaidl.idl";
+import "ocidl.idl";
+
+// TODO: generate other uuids
+
+[
+	uuid(d66ad502-5443-4b3f-93e4-ec0975fd3408),
+	version(1.0),
+	helpstring("ActiveN.Samples.WebView2 1.0 Type Library")
+]
+library ActiveNSamplesWebView2Lib
+{
+	importlib("stdole2.tlb");
+
+	[
+		object,
+		uuid(9d51ea97-30dd-4e70-99ae-a5085fbf8095),
+		dual,
+		nonextensible,
+		pointer_default(unique),
+		helpstring("IWebView2Control Interface"),
+	]
+	interface IWebView2Control : IDispatch
+	{
+		// these are standard properties for ActiveX controls (declared olectl.h)
+		[propput, bindable, requestedit, id(DISPID_ENABLED)]
+		HRESULT Enabled([in]VARIANT_BOOL vbool);
+		[propget, bindable, requestedit, id(DISPID_ENABLED)]
+			HRESULT Enabled([out, retval]VARIANT_BOOL* pbool);
+
+		[propput, bindable, requestedit, id(DISPID_CAPTION)]
+			HRESULT Caption([in]BSTR strCaption);
+		[propget, bindable, requestedit, id(DISPID_CAPTION)]
+			HRESULT Caption([out, retval]BSTR* pstrCaption);
+	};
+
+	[
+		uuid(27ef2dff-595f-4724-aea1-d16f7730dc33),
+		helpstring("WebView2Control Class")
+	]
+		coclass WebView2Control
+	{
+		[default] interface IWebView2Control;
+	}
+}
