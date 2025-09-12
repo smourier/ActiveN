@@ -1,4 +1,7 @@
-﻿namespace ActiveN.Utilities;
+﻿// Copyright (c) Aelyo Softworks S.A.S.. All rights reserved.
+// See LICENSE in the project root for license information.
+
+namespace ActiveN.Utilities;
 
 // Winforms .NET Core is not yet AOT-capable, we cannot use its PropertyGrid yet, so we use .NET Framework's PropertyGrid for now
 // since it's always installed and doesn't require any additional dependencies.

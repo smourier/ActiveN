@@ -1,4 +1,7 @@
-﻿namespace ActiveN.Hosting;
+﻿// Copyright (c) Aelyo Softworks S.A.S.. All rights reserved.
+// See LICENSE in the project root for license information.
+
+namespace ActiveN.Hosting;
 
 // this implements something similar to this https://learn.microsoft.com/en-us/windows/win32/com/aggregation
 // but we cannot really implement code as described in doc above

@@ -1,4 +1,7 @@
-﻿namespace ActiveN;
+﻿// Copyright (c) Aelyo Softworks S.A.S.. All rights reserved.
+// See LICENSE in the project root for license information.
+
+namespace ActiveN;
 
 [GeneratedComClass]
 public abstract partial class BasePropertyPage : ICustomQueryInterface, IDisposable,

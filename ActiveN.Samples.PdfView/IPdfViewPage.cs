@@ -1,4 +1,7 @@
-﻿namespace ActiveN.Samples.PdfView;
+﻿// Copyright (c) Aelyo Softworks S.A.S.. All rights reserved.
+// See LICENSE in the project root for license information.
+
+namespace ActiveN.Samples.PdfView;
 
 [Guid("22be6c86-8234-4fee-9a4f-e4d251ff9358")]
 [GeneratedComInterface]

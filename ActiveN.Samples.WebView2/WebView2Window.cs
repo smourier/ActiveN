@@ -1,4 +1,7 @@
-﻿namespace ActiveN.Samples.WebView2;
+﻿// Copyright (c) Aelyo Softworks S.A.S.. All rights reserved.
+// See LICENSE in the project root for license information.
+
+namespace ActiveN.Samples.WebView2;
 
 public class WebView2Window(HWND parentHandle, WINDOW_STYLE style, RECT rect)
     : Window(title: nameof(WebView2Window), parentHandle: parentHandle, style: style, rect: rect)

@@ -1,4 +1,7 @@
-﻿namespace ActiveN.Samples.WebView2;
+﻿// Copyright (c) Aelyo Softworks S.A.S.. All rights reserved.
+// See LICENSE in the project root for license information.
+
+namespace ActiveN.Samples.WebView2;
 
 [Guid("9d51ea97-30dd-4e70-99ae-a5085fbf8095")]
 [GeneratedComInterface]

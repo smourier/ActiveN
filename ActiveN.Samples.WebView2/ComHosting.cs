@@ -1,4 +1,7 @@
-﻿namespace ActiveN.Samples.WebView2;
+﻿// Copyright (c) Aelyo Softworks S.A.S.. All rights reserved.
+// See LICENSE in the project root for license information.
+
+namespace ActiveN.Samples.WebView2;
 
 // this class *must* be named ComHosting and reside in assembly root namespace or in assembly root namespace + ".Hosting"
 // for AotNetComHost.*.dll to find it (this is only for DEBUG builds)

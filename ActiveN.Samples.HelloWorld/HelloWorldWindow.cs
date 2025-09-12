@@ -1,4 +1,7 @@
-﻿namespace ActiveN.Samples.HelloWorld;
+﻿// Copyright (c) Aelyo Softworks S.A.S.. All rights reserved.
+// See LICENSE in the project root for license information.
+
+namespace ActiveN.Samples.HelloWorld;
 
 public class HelloWorldWindow(HWND parentHandle, WINDOW_STYLE style, RECT rect)
     : Window(title: nameof(HelloWorldWindow), parentHandle: parentHandle, style: style, rect: rect)

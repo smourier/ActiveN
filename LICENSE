@@ -1,21 +1,10 @@
-MIT License
+Copyright (c) 2024-2025 Aelyo Softworks S.A.S.
 
-Copyright (c) 2025 Simon Mourier
+The ActiveN Framework ("ActiveN") project is dual-licensed under commercial and open source license.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+The commercial ActiveN license gives you the full rights to create and distribute software on your own terms without any open source license obligations.
+With the commercial license you also have access to the official ActiveN Support and close strategic relationship with Aelyo Softworks to make sure your development goals are met.
+Contact us for commercial license details and quotes.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+The ActiveN project is also available under LGPLv3 open source license
+The ActiveN open source licensing is ideal for use cases such as open source projects with open source distribution, student/academic purposes, hobby projects, internal research projects without external distribution, or other projects where all LGPL obligations can be met.

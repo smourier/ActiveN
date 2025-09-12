@@ -1,4 +1,7 @@
-﻿namespace ActiveN.Samples.HelloWorld;
+﻿// Copyright (c) Aelyo Softworks S.A.S.. All rights reserved.
+// See LICENSE in the project root for license information.
+
+namespace ActiveN.Samples.HelloWorld;
 
 // TODO: generate another GUID, change ProgId and DisplayName
 // This GUID *must* match the one in the corresponding .idl coclass
