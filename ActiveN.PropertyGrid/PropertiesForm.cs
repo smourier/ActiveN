@@ -1,29 +1,49 @@
-﻿using System.Collections.Concurrent;
-using System.Drawing;
-using System.Linq;
-
-namespace ActiveN.PropertyGrid;
+﻿namespace ActiveN.PropertyGrid;
 
 public class PropertiesForm : Form
 {
-    private static readonly ConcurrentDictionary<int, PropertiesForm> _instances = new();
-
-    protected override bool ShowWithoutActivation => true;
-
     public PropertiesForm()
     {
+        FormBorderStyle = FormBorderStyle.None;
         Text = "ActiveN Property Grid";
-        StartPosition = FormStartPosition.Manual;
-        Location = new Point(100, 100);
-        Size = new Size(400, 600);
         Grid = new System.Windows.Forms.PropertyGrid
         {
-            Dock = DockStyle.Fill
+            Dock = DockStyle.Fill,
+            HelpVisible = false,
+            CommandsVisibleIfAvailable = false,
+            ToolbarVisible = false
         };
         Controls.Add(Grid);
     }
 
+    protected override bool ShowWithoutActivation => true;
+    public nint ParentHandle { get; set; }
     public System.Windows.Forms.PropertyGrid Grid { get; }
+
+    protected override void WndProc(ref Message m)
+    {
+        Trace("Msg: " + MessageDecoder.Decode(m));
+        if (m.Msg == WM_PARENTNOTIFY)
+        {
+            var eventMsg = (int)(m.WParam.ToInt64() & 0xFFFF);
+            if (eventMsg == WM_LBUTTONDOWN ||
+                eventMsg == WM_MBUTTONDOWN ||
+                eventMsg == WM_RBUTTONDOWN ||
+                eventMsg == WM_XBUTTONDOWN ||
+                eventMsg == WM_POINTERDOWN)
+            {
+                SetFocus(ParentHandle);
+            }
+        }
+        base.WndProc(ref m);
+    }
+
+    private void SizeToParent()
+    {
+        GetClientRect(ParentHandle, out var rect);
+        Location = new Point(rect.left, rect.top);
+        Size = new Size(rect.right - rect.left, rect.bottom - rect.top);
+    }
 
 #pragma warning disable IDE0060 // Remove unused parameter
     public static int Show(string argument) // imposed by ClrRuntimeHost
@@ -41,12 +61,7 @@ public class PropertiesForm : Form
                 Trace($"UnhandledException: {e.ExceptionObject}");
             };
 
-            if (!_instances.TryGetValue(Environment.CurrentManagedThreadId, out var form))
-            {
-                form = new PropertiesForm();
-                Trace($"Already shown");
-                _instances[Environment.CurrentManagedThreadId] = form;
-            }
+            var form = new PropertiesForm();
 
             var spmType = Type.GetTypeFromProgID("MTxSpm.SharedPropertyGroupManager");
             dynamic spm = Activator.CreateInstance(spmType!)!;
@@ -54,39 +69,24 @@ public class PropertiesForm : Form
             var property = group.CreateProperty("SelectedObject", false);
             var value = property.Value;
 
-            Win32Window? parent = null;
             var args = ParseArguments(argument);
-            Trace($"value: {value} argument: {argument} args: {string.Join(",", args.Select(kv => kv.Key + "=" + kv.Value))}");
-            if (args.TryGetValue("parent", out var parentHwnd))
+            Trace($"value: {value} argument: {argument} parsed args: {string.Join(",", args.Select(kv => kv.Key + "=" + kv.Value))}");
+            if (!args.TryGetValue("parent", out var parent) || !ulong.TryParse(parent, out var parentHandle))
+                throw new InvalidOperationException("No valid parent HWND specified.");
+
+            if (args.ContainsKey("toolbarvisible"))
             {
-                parent = new Win32Window((nint)ulong.Parse(parentHwnd));
+                form.Grid.ToolbarVisible = true;
             }
 
-            var rect = new RECT { left = 0, top = 0, right = 200, bottom = 200 };
-            if (parent != null && parent.Handle != 0)
-            {
-                GetClientRect(parent.Handle, out var rc);
-                rect = rc;
-            }
-            else if (args.TryGetValue("rect", out var rects))
-            {
-                var rc = RECT.Parse(rects);
-                if (rc != null)
-                {
-                    rect = rc.Value;
-                }
-            }
-
+            var parentHwnd = (nint)parentHandle;
+            form.ParentHandle = parentHwnd;
             form.Grid.SelectedObject = value;
-            //form.Show(parent);
-            Trace($"shown: 0x{parent?.Handle:X} rect: {rect}");
-            if (parent != null)
-            {
-                SetParent(form.Handle, parent.Handle);
-                //MoveWindow(form.Handle, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, true);
-            }
+            SetParent(form.Handle, parentHwnd);
+
+            // parent's size should be fixed (OLE property page), no need to subclass/monitor size changes
+            form.SizeToParent();
             form.Show();
-            //form.ShowDialog(parent);
             Trace($"return");
             return 0;
         }
@@ -124,10 +124,19 @@ public class PropertiesForm : Form
     private static extern nint SetParent(nint hWndChild, nint hWndNewParent);
 
     [DllImport("user32")]
-    private static extern bool GetClientRect(nint hWndChild, out RECT hWndNewParent);
+    private static extern nint SetFocus(nint hWnd);
 
     [DllImport("user32")]
-    private static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
+    private static extern bool GetClientRect(nint hWndChild, out RECT hWndNewParent);
+
+#pragma warning disable IDE1006 // Naming Styles
+    private const int WM_PARENTNOTIFY = 0x0210;
+    private const int WM_LBUTTONDOWN = 0x0201;
+    private const int WM_MBUTTONDOWN = 0x0207;
+    private const int WM_RBUTTONDOWN = 0x0204;
+    private const int WM_XBUTTONDOWN = 0x020B;
+    private const int WM_POINTERDOWN = 0x0246;
+#pragma warning restore IDE1006 // Naming Styles
 
     private partial struct RECT
     {
@@ -135,33 +144,6 @@ public class PropertiesForm : Form
         public int top;
         public int right;
         public int bottom;
-
-        public static RECT? Parse(string s)
-        {
-            if (string.IsNullOrWhiteSpace(s))
-                return null;
-
-            var parts = s.Split([','], StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length == 4
-                && int.TryParse(parts[0], out var left)
-                && int.TryParse(parts[1], out var top)
-                && int.TryParse(parts[2], out var right)
-                && int.TryParse(parts[3], out var bottom))
-                return new RECT
-                {
-                    left = left,
-                    top = top,
-                    right = right,
-                    bottom = bottom
-                };
-            return null;
-        }
-        public override readonly string ToString() => $"({left},{top})-({right},{bottom})";
-    }
-
-    private sealed class Win32Window(nint handle) : IWin32Window
-    {
-        public nint Handle { get; } = handle;
     }
 
     public static void Trace(string? text = null, [CallerMemberName] string? methodName = null, [CallerFilePath] string? filePath = null)

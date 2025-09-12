@@ -131,11 +131,12 @@ public class PropertyGrid
         return null;
     }
 
-    public static HRESULT Show(HWND parent, RECT rect, object obj, bool throwOnError = true)
+    public static ClrRuntimeHost Show(HWND parent, RECT rect, object obj)
     {
         ArgumentNullException.ThrowIfNull(obj);
         var path = EnsureNetFxPropertyGridFiles();
-        using var host = GetHost() ?? throw new InvalidOperationException("Cannot find any .NET Framework runtime");
+        // don't do using or it will dispose too early
+        var host = GetHost() ?? throw new InvalidOperationException("Cannot find any .NET Framework runtime");
         TracingUtilities.Trace($"path: {path} host: {host} typeName: {TypeName} methodName: {MethodName}");
 
         // add object to SPM so the NET Framework PropertyGrid can find it
@@ -144,21 +145,21 @@ public class PropertyGrid
         var isoMode = (int)LockModes.LockSetGet;
         var releaseModes = (int)ReleaseModes.Standard;
 
-        spm.Object.CreatePropertyGroup(groupName, ref isoMode, ref releaseModes, out var gexists, out var spgObj).ThrowOnError(throwOnError);
+        spm.Object.CreatePropertyGroup(groupName, ref isoMode, ref releaseModes, out var gexists, out var spgObj).ThrowOnError();
         using var spg = new ComObject<ISharedPropertyGroup>(spgObj);
 
         using var propertyName = new Bstr("SelectedObject");
-        spg.Object.CreateProperty(propertyName, out var pexists, out var propObj).ThrowOnError(throwOnError);
+        spg.Object.CreateProperty(propertyName, out var pexists, out var propObj).ThrowOnError();
         using var prop = new ComObject<ISharedProperty>(propObj);
 
         return DirectN.Extensions.Com.ComObject.WithComInstance(obj, unk =>
         {
             using var v = new Variant(unk, VARENUM.VT_UNKNOWN);
-            prop.Object.put_Value(v.Detached).ThrowOnError(throwOnError);
+            prop.Object.put_Value(v.Detached).ThrowOnError();
 
             HRESULT hr = host.ExecuteInDefaultAppDomain(path, TypeName, MethodName, $"parent:{parent.Value}|rect:{rect}");
-            hr.ThrowOnError(throwOnError);
-            return hr;
+            hr.ThrowOnError();
+            return host;
         });
     }
 }

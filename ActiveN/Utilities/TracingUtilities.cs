@@ -22,7 +22,16 @@ public static class TracingUtilities
     private partial interface ICustomTypeDescriptorUnimplemented { } // name is ICustomTypeDescriptor+IUnimplemented
 
     [Guid("37b1ce8d-fe09-3007-86a1-e089298c718c")]
-    private partial interface IPropertyGridUnimplemented { } // name IPropertyGrid+IUnimplemented 
+    private partial interface IPropertyGridUnimplemented { } // name IPropertyGrid+IUnimplemented
+
+    // VB6 asks for these
+    [Guid("1ab42240-8c70-11ce-9421-00aa0062be57")]
+    private partial interface IVBDSC { };
+
+    [Guid("7c0ffab3-cd84-11d0-949a-00a0c91110ed")]
+#pragma warning disable IDE1006 // Naming Styles
+    private partial interface DataSource { };
+#pragma warning restore IDE1006 // Naming Styles
 
     // Office's VBA asks for these
     [Guid("049948d1-5686-11cf-8e0d-00aa00a74c5c")]

@@ -43,12 +43,30 @@
 		<Using Include="System.Threading.Tasks" />
 	</ItemGroup>
 
-	<ItemGroup>
+	<ItemGroup Condition="'$(Platform)'=='x86'">
 		<Reference Include="DirectN">
-			<HintPath>External\DirectN.dll</HintPath>
+			<HintPath>External\x86\DirectN.dll</HintPath>
 		</Reference>
 		<Reference Include="DirectN.Extensions">
-			<HintPath>External\DirectN.Extensions.dll</HintPath>
+			<HintPath>External\x86\DirectN.Extensions.dll</HintPath>
+		</Reference>
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(Platform)'=='x64'">
+		<Reference Include="DirectN">
+			<HintPath>External\x64\DirectN.dll</HintPath>
+		</Reference>
+		<Reference Include="DirectN.Extensions">
+			<HintPath>External\x64\DirectN.Extensions.dll</HintPath>
+		</Reference>
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(Platform)'=='ARM64'">
+		<Reference Include="DirectN">
+			<HintPath>External\ARM64\DirectN.dll</HintPath>
+		</Reference>
+		<Reference Include="DirectN.Extensions">
+			<HintPath>External\ARM64\DirectN.Extensions.dll</HintPath>
 		</Reference>
 	</ItemGroup>
 

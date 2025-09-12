@@ -6,6 +6,7 @@ public abstract partial class BasePropertyPage : ICustomQueryInterface, IDisposa
 {
     private IComObject<IPropertyPageSite>? _site;
     private Window? _window;
+    private IDisposable? _disposable;
     private readonly List<nint> _objects = [];
 
     protected virtual bool IsDirty { get; set; }
@@ -31,7 +32,7 @@ public abstract partial class BasePropertyPage : ICustomQueryInterface, IDisposa
 
         // this may be an outer from aggregation, so we must QI for the real object
         TracingUtilities.Trace($" object[0]: {obj.Object}");
-        PropertyGrid.Show(parent, rect, obj);
+        _disposable = PropertyGrid.Show(parent, rect, obj);
     }
 
     protected virtual void DisposeObjects()
@@ -75,6 +76,7 @@ public abstract partial class BasePropertyPage : ICustomQueryInterface, IDisposa
             Interlocked.Exchange(ref _site, null)?.Dispose();
             DisposeWindow();
             DisposeObjects();
+            Interlocked.Exchange(ref _disposable, null)?.Dispose();
         }
     }
 

@@ -22,10 +22,13 @@
 		<Using Include="ActiveN" />
 		<Using Include="ActiveN.PropertyGrid" />
 		<Using Include="System" />
+		<Using Include="System.Collections.Concurrent" />
 		<Using Include="System.Collections.Generic" />
 		<Using Include="System.ComponentModel" />
 		<Using Include="System.Diagnostics.CodeAnalysis" />
+		<Using Include="System.Drawing" />
 		<Using Include="System.IO" />
+		<Using Include="System.Linq" />
 		<Using Include="System.Reflection" />
 		<Using Include="System.Runtime.CompilerServices" />
 		<Using Include="System.Windows.Forms" />
