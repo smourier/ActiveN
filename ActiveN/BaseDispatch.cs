@@ -589,7 +589,7 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
         var hr = TracingUtilities.WrapErrors(() =>
         {
             propcat = MapPropertyToCategory((int)dispId);
-            TracingUtilities.Trace($"dispId: {dispId} (0x:{dispId:X}) cat: {propcat}");
+            TracingUtilities.Trace($"dispId: {dispId} (0x{(int)dispId:X8}");
             return Constants.S_OK;
         });
         ppropcat = propcat;
@@ -612,7 +612,7 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
 
     HRESULT IVsPerPropertyBrowsing.HideProperty(int dispId, out BOOL pfHide)
     {
-        TracingUtilities.Trace($"dispId: {dispId}");
+        TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x{dispId:X8}");
         // we already filter properties in the property browser using Browsable
         pfHide = false;
         return Constants.S_OK;
@@ -620,14 +620,14 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
 
     HRESULT IVsPerPropertyBrowsing.DisplayChildProperties(int dispId, out BOOL pfDisplay)
     {
-        TracingUtilities.Trace($"dispId: {dispId}");
+        TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x{dispId:X8}");
         pfDisplay = true;
         return Constants.S_OK;
     }
 
     unsafe HRESULT IVsPerPropertyBrowsing.GetLocalizedPropertyInfo(int dispId, uint localeID, nint pbstrLocalizedName, nint pbstrLocalizeDescription)
     {
-        TracingUtilities.Trace($"dispId: {dispId} localeID: {localeID} pbstrLocalizedName: {pbstrLocalizedName} pbstrLocalizeDescription: {pbstrLocalizeDescription}");
+        TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x{dispId:X8} localeID: {localeID} pbstrLocalizedName: {pbstrLocalizedName} pbstrLocalizeDescription: {pbstrLocalizeDescription}");
         if (pbstrLocalizeDescription != 0)
         {
             *(BSTR*)pbstrLocalizeDescription = BSTR.Null;
@@ -642,7 +642,7 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
 
     HRESULT IVsPerPropertyBrowsing.HasDefaultValue(int dispId, out BOOL fDefault)
     {
-        TracingUtilities.Trace($"dispId: {dispId}");
+        TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x{dispId:X8}");
         var type = GetDispatchType();
         var member = type.GetMember(dispId);
         fDefault = member?.DefaultString != null;
@@ -651,7 +651,7 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
 
     HRESULT IVsPerPropertyBrowsing.IsPropertyReadOnly(int dispId, out BOOL fReadOnly)
     {
-        TracingUtilities.Trace($"dispId: {dispId}");
+        TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x{dispId:X8}");
         var type = GetDispatchType();
         var member = type.GetMember(dispId);
         fReadOnly = true;
@@ -680,7 +680,7 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
 
     HRESULT IVsPerPropertyBrowsing.CanResetPropertyValue(int dispId, out BOOL pfCanReset)
     {
-        TracingUtilities.Trace($"dispId: {dispId}");
+        TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x {dispId:X8}");
         var type = GetDispatchType();
         var member = type.GetMember(dispId);
         pfCanReset = member?.DefaultString != null;
@@ -689,7 +689,7 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
 
     HRESULT IVsPerPropertyBrowsing.ResetPropertyValue(int dispId) => TracingUtilities.WrapErrors(() =>
     {
-        TracingUtilities.Trace($"dispId: {dispId}");
+        TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x {dispId:X8}");
         var type = GetDispatchType();
         var member = type.GetMember(dispId);
         if (member == null)
@@ -708,9 +708,9 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
         return Constants.S_OK;
     });
 
-    unsafe HRESULT IVSMDPerPropertyBrowsing.GetPropertyAttributes(int dispId, out uint pceltAttrs, out nint ppbstrTypeNames, out nint ppvarAttrValues)
+    HRESULT IVSMDPerPropertyBrowsing.GetPropertyAttributes(int dispId, out uint pceltAttrs, out nint ppbstrTypeNames, out nint ppvarAttrValues)
     {
-        TracingUtilities.Trace($"dispId: {dispId}");
+        TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x{dispId:X8}");
         pceltAttrs = 0;
         ppbstrTypeNames = 0;
         ppvarAttrValues = 0;
@@ -723,7 +723,6 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
 
         var type = GetDispatchType();
         var category = type.GetMember(dispId)?.Category;
-
         if (category != null)
         {
             var name = category.GetLocalizedName((uint)Thread.CurrentThread.CurrentUICulture.LCID).Nullify();
@@ -741,26 +740,29 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
 
         if (list.Count > 0)
         {
-            var bstrs = (BSTR*)Marshal.AllocCoTaskMem(sizeof(BSTR) * list.Count);
-            var vars = (VARIANT*)Marshal.AllocCoTaskMem(sizeof(VARIANT) * list.Count);
-            for (var i = 0; i < list.Count; i++)
+            unsafe
             {
-                var att = list[i];
-                TracingUtilities.Trace($" attr #{i}: {att}");
-                bstrs[i] = new BSTR(Marshal.StringToBSTR(att.type.FullName));
-                vars[i] = new Variant(att.value).Detach();
-            }
+                var bstrs = (BSTR*)Marshal.AllocCoTaskMem(sizeof(BSTR) * list.Count);
+                var vars = (VARIANT*)Marshal.AllocCoTaskMem(sizeof(VARIANT) * list.Count);
+                for (var i = 0; i < list.Count; i++)
+                {
+                    var att = list[i];
+                    TracingUtilities.Trace($" attr #{i}: {att}");
+                    bstrs[i] = new BSTR(Marshal.StringToBSTR(att.type.FullName));
+                    vars[i] = new Variant(att.value).Detach();
+                }
 
-            pceltAttrs = (uint)list.Count;
-            ppbstrTypeNames = (nint)bstrs;
-            ppvarAttrValues = (nint)vars;
+                pceltAttrs = (uint)list.Count;
+                ppbstrTypeNames = (nint)bstrs;
+                ppvarAttrValues = (nint)vars;
+            }
         }
         return Constants.S_OK;
     }
 
     HRESULT IProvidePropertyBuilder.MapPropertyToBuilder(int dispId, out CTLBLDTYPE pdwCtlBldType, out BSTR pbstrGuidBldr, out VARIANT_BOOL builderAvailable)
     {
-        TracingUtilities.Trace($"dispId: {dispId}");
+        TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x{dispId:X8}");
         pdwCtlBldType = 0;
         pbstrGuidBldr = BSTR.Null;
         builderAvailable = false;
@@ -769,7 +771,7 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
 
     HRESULT IProvidePropertyBuilder.ExecuteBuilder(int dispId, BSTR bstrGuidBldr, IDispatch pdispApp, HWND hwndBldrOwner, in VARIANT pvarValue, out VARIANT_BOOL pbActionCommitted)
     {
-        TracingUtilities.Trace($"dispId: {dispId} bstrGuidBldr: {bstrGuidBldr} pdispApp: {pdispApp} hwndBldrOwner: {hwndBldrOwner} pvarValue: {pvarValue.Anonymous.Anonymous.vt}");
+        TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x{dispId:X8} bstrGuidBldr: {bstrGuidBldr} pdispApp: {pdispApp} hwndBldrOwner: {hwndBldrOwner} pvarValue: {pvarValue.Anonymous.Anonymous.vt}");
         pbActionCommitted = false;
         return Constants.S_OK;
     }
