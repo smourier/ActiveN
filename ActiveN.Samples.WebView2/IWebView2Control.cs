@@ -10,18 +10,34 @@ public partial interface IWebView2Control : IDispatch
 #pragma warning disable IDE1006 // Naming Styles
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
-    HRESULT set_Enabled(BOOL value);
+    HRESULT get_Source(out BSTR value);
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
-    HRESULT get_Enabled(out BOOL value);
+    HRESULT get_StatusBarText(out BSTR value);
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
-    HRESULT set_Caption(BSTR value);
-
-    [PreserveSig]
-    [return: MarshalAs(UnmanagedType.Error)]
-    HRESULT get_Caption(out BSTR value);
+    HRESULT get_DocumentTitle(out BSTR value);
 #pragma warning restore IDE1006 // Naming Styles
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT Navigate(BSTR uri);
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT NavigateToString(BSTR htmlContent);
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT GoBack();
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT GoForward();
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT Reload();
 }

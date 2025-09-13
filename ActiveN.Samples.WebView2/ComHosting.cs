@@ -10,8 +10,8 @@ public class ComHosting : ComRegistration
     public static ComHosting Instance { get; } = new();
 
     public ComHosting() : base([
-        // TODO: add your COM visible types here
-        new ComRegistrationType(typeof(WebView2Control))
+            new ComRegistrationType(typeof(WebView2Control)),
+            new ComRegistrationType(typeof(WebView2ControlPage))
         ])
     {
     }

@@ -25,7 +25,6 @@ public class PropertiesForm : Form
 
     protected override void WndProc(ref Message m)
     {
-        Trace("Msg: " + MessageDecoder.Decode(m));
         if (m.Msg == WM_PARENTNOTIFY)
         {
             var eventMsg = (int)(m.WParam.ToInt64() & 0xFFFF);

@@ -23,16 +23,22 @@ library ActiveNSamplesWebView2Lib
 	]
 	interface IWebView2Control : IDispatch
 	{
-		// these are standard properties for ActiveX controls (declared olectl.h)
-		[propput, bindable, requestedit, id(DISPID_ENABLED)]
-		HRESULT Enabled([in]VARIANT_BOOL vbool);
-		[propget, bindable, requestedit, id(DISPID_ENABLED)]
-			HRESULT Enabled([out, retval]VARIANT_BOOL* pbool);
+		[propget]
+		HRESULT Source([out, retval]BSTR* value);
 
-		[propput, bindable, requestedit, id(DISPID_CAPTION)]
-			HRESULT Caption([in]BSTR strCaption);
-		[propget, bindable, requestedit, id(DISPID_CAPTION)]
-			HRESULT Caption([out, retval]BSTR* pstrCaption);
+		[propget]
+			HRESULT StatusBarText([out, retval]BSTR* value);
+
+		[propget, id(DISPID_CAPTION)]
+			HRESULT DocumentTitle([out, retval]BSTR* value);
+
+		HRESULT Navigate(BSTR uri);
+		HRESULT NavigateToString(BSTR htmlContent);
+		HRESULT GoBack();
+		HRESULT GoForward();
+
+		[id(DISPID_REFRESH)]
+			HRESULT Reload();
 	};
 
 	[

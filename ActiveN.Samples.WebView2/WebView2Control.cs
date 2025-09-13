@@ -12,23 +12,18 @@ namespace ActiveN.Samples.WebView2;
 [GeneratedComClass]
 public partial class WebView2Control : BaseControl, IWebView2Control
 {
+    public WebView2Control()
+    {
+        PropertyPagesIds = [typeof(WebView2ControlPage).GUID];
+    }
+
     #region Mandatory overrides
     protected override ComRegistration ComRegistration => ComHosting.Instance;
     protected override Guid DispatchInterfaceId => typeof(IWebView2Control).GUID;
     protected override Window CreateWindow(HWND parentHandle, RECT rect) => new WebView2Window(parentHandle, GetDefaultWindowStyle(parentHandle), rect);
-
-    // note this is necesary to avoid trimming Task<T>.Result for AOT publishing
-    // all Task<T> results should be unwrapped here
-    // so you can return any type needed by public methods and properties returning Tasks
-    protected override object? GetTaskResult(Task task)
-    {
-        // string here is at least for the GetInfoAsync method below
-        if (task is Task<string> s)
-            return s.Result;
-
-        return null;
-    }
     #endregion
+
+    public new WebView2Window? Window => (WebView2Window?)base.Window; // disposed by BaseControl
 
     protected override void Draw(HDC hdc, RECT bounds)
     {
@@ -42,13 +37,38 @@ public partial class WebView2Control : BaseControl, IWebView2Control
 #pragma warning disable CA1822 // Mark members as static; no since we're dealing with COM instance methods & properties
 
     // COM visible public properties exposed through IWebView2Control IDL should go here
-    public bool Enabled { get; set; } = true;
-    HRESULT IWebView2Control.get_Enabled(out BOOL value) { value = Enabled; return Constants.S_OK; }
-    HRESULT IWebView2Control.set_Enabled(BOOL value) { Enabled = value; return Constants.S_OK; }
+    [DispId(unchecked((int)DISPID.STDPROPID_XOBJ_NAME))]
+    public string Name { get => GetStockProperty<string>() ?? nameof(WebView2Control); set => SetStockProperty(value); }
 
-    public string Caption { get; set; } = "WebView2";
-    HRESULT IWebView2Control.get_Caption(out BSTR value) { value = new BSTR(Marshal.StringToBSTR(Caption)); return Constants.S_OK; }
-    HRESULT IWebView2Control.set_Caption(BSTR value) { Caption = value.ToString() ?? string.Empty; return Constants.S_OK; }
+    public string BrowserVersion => WebView2Window.BrowserVersion;
+    public string Source => Window?.Source ?? string.Empty;
+    public string StatusBarText => Window?.StatusBarText ?? string.Empty;
+    public string DocumentTitle => Window?.DocumentTitle ?? string.Empty;
+
+    HRESULT IWebView2Control.get_Source(out BSTR value) { value = new BSTR(Marshal.StringToBSTR(Source)); return DirectN.Constants.S_OK; }
+    HRESULT IWebView2Control.get_StatusBarText(out BSTR value) { value = new BSTR(Marshal.StringToBSTR(StatusBarText)); return DirectN.Constants.S_OK; }
+    HRESULT IWebView2Control.get_DocumentTitle(out BSTR value) { value = new BSTR(Marshal.StringToBSTR(DocumentTitle)); return DirectN.Constants.S_OK; }
+
+    HRESULT IWebView2Control.GoBack() { Window?.GoBack(); return DirectN.Constants.S_OK; }
+    HRESULT IWebView2Control.GoForward() { Window?.GoForward(); return DirectN.Constants.S_OK; }
+    HRESULT IWebView2Control.Reload() { Window?.Reload(); return DirectN.Constants.S_OK; }
+    HRESULT IWebView2Control.Navigate(BSTR uri)
+    {
+        if (uri.Value == 0)
+            return DirectN.Constants.E_POINTER;
+
+        Window?.Navigate(Marshal.PtrToStringBSTR(uri.Value) ?? string.Empty);
+        return DirectN.Constants.S_OK;
+    }
+
+    HRESULT IWebView2Control.NavigateToString(BSTR htmlContent)
+    {
+        if (htmlContent.Value == 0)
+            return DirectN.Constants.E_POINTER;
+
+        Window?.NavigateToString(Marshal.PtrToStringBSTR(htmlContent.Value) ?? string.Empty);
+        return DirectN.Constants.S_OK;
+    }
 
 #pragma warning restore CA1822 // Mark members as static
     #endregion

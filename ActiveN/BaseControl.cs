@@ -1688,7 +1688,7 @@ public abstract partial class BaseControl : BaseDispatch,
         var hr = TracingUtilities.WrapErrors(() =>
         {
             var name = GetDisplayString(dispId);
-            TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x:{dispId:X}) name: '{name}'");
+            TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x{dispId:X}) name: '{name}'");
             if (name != null)
             {
                 bstr = new BSTR(Marshal.StringToBSTR(name));
@@ -1706,7 +1706,7 @@ public abstract partial class BaseControl : BaseDispatch,
         var hr = TracingUtilities.WrapErrors(() =>
         {
             var id = MapPropertyToPage(dispId);
-            TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x:{dispId:X}) clsid: {id}");
+            TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x{dispId:X}) clsid: {id}");
             if (id != null)
             {
                 clsid = id.Value;
@@ -1770,7 +1770,7 @@ public abstract partial class BaseControl : BaseDispatch,
                     hr = Constants.S_OK;
                 }
             }
-            TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x:{dispId:X}) strings: {strElemsCount} cookies: {cookiesElemsCount}");
+            TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x{dispId:X}) strings: {strElemsCount} cookies: {cookiesElemsCount}");
             return hr;
         });
 
@@ -1789,7 +1789,7 @@ public abstract partial class BaseControl : BaseDispatch,
 
     HRESULT IPerPropertyBrowsing.GetPredefinedValue(int dispId, uint dwCookie, out VARIANT pVarOut)
     {
-        TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x:{dispId:X}) dwCookie: {dwCookie}");
+        TracingUtilities.Trace($"dispId: {(DISPID)dispId} (0x{dispId:X}) dwCookie: {dwCookie}");
         var variant = new VARIANT();
         var hr = TracingUtilities.WrapErrors(() =>
         {

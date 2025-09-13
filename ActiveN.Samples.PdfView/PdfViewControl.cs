@@ -115,7 +115,7 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
     HRESULT IPdfViewControl.set_Enabled(VARIANT_BOOL value) { Enabled = value; return Constants.S_OK; }
 
     [DispId(unchecked((int)DISPID.STDPROPID_XOBJ_NAME))]
-    public string Name { get => GetStockProperty<string>() ?? "PdfViewControl"; set => SetStockProperty(value); }
+    public string Name { get => GetStockProperty<string>() ?? nameof(PdfViewControl); set => SetStockProperty(value); }
 
     public string FilePath => Window?.FilePath ?? string.Empty;
     HRESULT IPdfViewControl.get_FilePath(out BSTR value) { value = new BSTR(Marshal.StringToBSTR(FilePath)); return Constants.S_OK; }
@@ -145,7 +145,7 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
     HRESULT IPdfViewControl.get_HWND(out nint value) { value = HWND; return Constants.S_OK; }
 
     [DispId(unchecked((int)DISPID.DISPID_CAPTION))]
-    public string Caption { get; set; } = "ActiveN PdfViewControl";
+    public string Caption { get; set; } = $"ActiveN {nameof(PdfViewControl)}";
 
     public void OpenFile(string filePath)
     {
