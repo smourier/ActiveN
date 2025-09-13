@@ -74,6 +74,9 @@ library ActiveNSamplesPdfViewLib
 			HRESULT PageCount([out, retval] long* value);
 
 		[propget, bindable, requestedit]
+			HRESULT CurrentPageIndex([out, retval] long* value);
+
+		[propget, bindable, requestedit]
 			HRESULT IsPasswordProtected([out, retval] VARIANT_BOOL* value);
 
 		[propget, bindable, requestedit]

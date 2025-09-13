@@ -1156,7 +1156,7 @@ public abstract partial class BaseControl : BaseDispatch,
     HRESULT IOleControl.OnAmbientPropertyChange(int dispId) => TracingUtilities.WrapErrors(() =>
     {
         var dispid = (DISPID)dispId;
-        TracingUtilities.Trace($"dispID: {(DISPID)dispid}");
+        TracingUtilities.Trace($"dispID: {dispid}");
         OnAmbientPropertyChanged(dispid);
         return Constants.S_OK;
     });
@@ -1819,8 +1819,8 @@ public abstract partial class BaseControl : BaseDispatch,
 
     HRESULT IPersistStreamInit.Load(IStream pStm) => TracingUtilities.WrapErrors(() =>
     {
-        ArgumentNullException.ThrowIfNull(pStm);
         TracingUtilities.Trace($"pStm {pStm}");
+        ArgumentNullException.ThrowIfNull(pStm);
         using var sois = new StreamOnIStream(pStm, true);
         Load(sois);
         return Constants.S_OK;

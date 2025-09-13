@@ -10,19 +10,19 @@ public partial interface IHelloWorldControl : IDispatch
 #pragma warning disable IDE1006 // Naming Styles
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
-    HRESULT get_Enabled(out BOOL value);
-
-    [PreserveSig]
-    [return: MarshalAs(UnmanagedType.Error)]
     HRESULT set_Enabled(BOOL value);
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
-    HRESULT get_Caption(out BSTR value);
+    HRESULT get_Enabled(out BOOL value);
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
     HRESULT set_Caption(BSTR value);
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT get_Caption(out BSTR value);
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]

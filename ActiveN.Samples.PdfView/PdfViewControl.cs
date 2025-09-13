@@ -31,14 +31,7 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
         var IID_IPdfViewControlEvents = new Guid("48c606f1-d597-467d-8a38-1c02fd7e019d"); // this must match the one in the .idl
         _eventsConnectionPoint = new DispatchConnectionPoint(IID_IPdfViewControlEvents);
         AddConnectionPoint(_eventsConnectionPoint);
-        PropertyPagesIds = [
-            typeof(PdfViewControlPage).GUID,
-
-            // these seems to exist only in x86 Windows
-            //Constants.CLSID_StockFontPage,
-            //Constants.CLSID_StockColorPage,
-            //Constants.CLSID_StockPicturePage
-            ];
+        PropertyPagesIds = [typeof(PdfViewControlPage).GUID];
     }
 
     #region Mandatory overrides
@@ -130,6 +123,9 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
     public int PageCount => Window?.PageCount ?? -1;
     HRESULT IPdfViewControl.get_PageCount(out int value) { value = PageCount; return Constants.S_OK; }
 
+    public int CurrentPageIndex => (int?)(Window?.CurrentPdfPage?.Index) ?? -1;
+    HRESULT IPdfViewControl.get_CurrentPageIndex(out int value) { value = CurrentPageIndex; return Constants.S_OK; }
+
     public bool IsPasswordProtected => Window?.IsPasswordProtected ?? false;
     HRESULT IPdfViewControl.get_IsPasswordProtected(out VARIANT_BOOL value) { value = IsPasswordProtected; return Constants.S_OK; }
 
@@ -183,9 +179,13 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
 
     public PdfViewPage GetPage(int pageNumber)
     {
-        var window = Window ?? throw new Exception("No file was opened.");
+        // shows how to throw a nice error to COM clients
+        var window = Window;
+        if (window == null)
+            TracingUtilities.ThrowArgument("Control was not initialized.");
+
         if (window.PdfDocument == null)
-            throw new Exception("No document was opened.");
+            TracingUtilities.ThrowArgument("No document was opened.");
 
         return new(this, window.PdfDocument.GetPage((uint)pageNumber));
     }

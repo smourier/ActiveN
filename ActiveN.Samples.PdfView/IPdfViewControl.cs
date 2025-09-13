@@ -10,15 +10,11 @@ public partial interface IPdfViewControl : IDispatch
 #pragma warning disable IDE1006 // Naming Styles
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
-    HRESULT get_Enabled(out VARIANT_BOOL value);
-
-    [PreserveSig]
-    [return: MarshalAs(UnmanagedType.Error)]
     HRESULT set_Enabled(VARIANT_BOOL value);
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
-    HRESULT get_BackColor(out OLE_COLOR value);
+    HRESULT get_Enabled(out VARIANT_BOOL value);
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
@@ -26,7 +22,7 @@ public partial interface IPdfViewControl : IDispatch
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
-    HRESULT get_ShowControls(out VARIANT_BOOL value);
+    HRESULT get_BackColor(out OLE_COLOR value);
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
@@ -34,7 +30,15 @@ public partial interface IPdfViewControl : IDispatch
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT get_ShowControls(out VARIANT_BOOL value);
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
     HRESULT get_PageCount(out int value);
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT get_CurrentPageIndex(out int value);
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
@@ -51,11 +55,11 @@ public partial interface IPdfViewControl : IDispatch
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
-    HRESULT OpenFile(BSTR filePath);
+    HRESULT OpenStream(IStream stream);
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
-    HRESULT OpenStream(IStream stream);
+    HRESULT OpenFile(BSTR filePath);
 
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]

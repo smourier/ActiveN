@@ -130,6 +130,24 @@ public static class TracingUtilities
         EventProvider.Default.WriteMessageEvent($"[{Environment.CurrentManagedThreadId}]{name}:: {methodName}: {text}");
     }
 
+    [DoesNotReturn]
+    public static void Throw(string text, [CallerMemberName] string? methodName = null, [CallerFilePath] string? filePath = null)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        Trace(text, methodName, filePath);
+        SetError(text, methodName, filePath);
+        throw new Exception(text);
+    }
+
+    [DoesNotReturn]
+    public static void ThrowArgument(string text, [CallerMemberName] string? methodName = null, [CallerFilePath] string? filePath = null)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        Trace(text, methodName, filePath);
+        SetError(text, methodName, filePath);
+        throw new ArgumentException(text);
+    }
+
     public static T? WrapErrors<T>(this Func<T> action, Action? actionOnError = null, [CallerMemberName] string? methodName = null, [CallerFilePath] string? filePath = null)
     {
         ArgumentNullException.ThrowIfNull(action);
@@ -141,7 +159,6 @@ public static class TracingUtilities
         {
             // transform this one as a well-known access denied
             Trace($"Security Error: {se}", methodName, filePath);
-            SetError(se.GetInterestingExceptionMessage(), methodName, filePath);
             if (actionOnError != null)
             {
                 try
@@ -168,7 +185,6 @@ public static class TracingUtilities
         catch (Exception ex)
         {
             Trace($"Error: {ex}", methodName, filePath);
-            SetError(ex.GetInterestingExceptionMessage(), methodName, filePath);
             if (actionOnError != null)
             {
                 try
@@ -223,7 +239,7 @@ public static class TracingUtilities
         {
             // transform this one as a well-known access denied
             Trace($"Security Error: {se}", methodName, filePath);
-            SetError(se.GetInterestingExceptionMessage(), methodName, filePath);
+            //SetError(se.GetInterestingExceptionMessage(), methodName, filePath);
             if (actionOnError != null)
             {
                 try
@@ -241,7 +257,7 @@ public static class TracingUtilities
         catch (Exception ex)
         {
             Trace($"Error: {ex}", methodName, filePath);
-            SetError(ex.GetInterestingExceptionMessage(), methodName, filePath);
+            //SetError(ex.GetInterestingExceptionMessage(), methodName, filePath);
             if (actionOnError != null)
             {
                 try
@@ -277,6 +293,7 @@ public static class TracingUtilities
         if (string.IsNullOrWhiteSpace(description))
             return;
 
+        Trace($"SetError: {description}", methodName, filePath);
         ComError.SetError(description, GetSource(methodName, filePath));
     }
 }
