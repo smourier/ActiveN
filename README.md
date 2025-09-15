@@ -172,7 +172,26 @@ So in the end, the .NET Framework is very AOT-compatible and what happens is Act
 > This is optional, ActiveN doesn't require this. You can still implement your own property pages using Win32 if you want.
 
 Here is a screenshot of the PropertyGrid-based property page in action (from the `ActiveN.Samples.HelloWorld` sample) in an Excel Spreadsheet in design mode:
+
  ![Property Page](/assets/custom_property_page.png?raw=true)
 
  ## Some screenshots:
+
+ VB6 Hosting WebView2 (design mode)
+ 
+ <img width="1361" height="784" alt="VB6 ActiveX Control .NET Core Design" src="https://github.com/user-attachments/assets/08b4eee8-b895-4fb8-b963-a7fcdbec7105" />
+
+ User mode:
+
+ <img width="836" height="547" alt="VB6 ActiveX Control .NET Core" src="https://github.com/user-attachments/assets/8461f3c9-bf58-4bf9-9b7f-060629095375" />
+
+ Microsoft Word (Office 365 x64) Hosting PDF View (design mode)
+
+ <img width="925" height="553" alt="Word ActiveX Control .NET Core PDF Design" src="https://github.com/user-attachments/assets/522fb215-59ac-4a5f-8caf-1681c27c4a03" />
+
+ User mode:
+
+<img width="989" height="772" alt="Word ActiveX Control .NET Core PDF" src="https://github.com/user-attachments/assets/d07b6da8-1307-4800-a779-4148b3ff1612" />
+
+
 
