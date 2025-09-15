@@ -172,7 +172,7 @@ So in the end, the .NET Framework is very AOT-compatible and what happens is Act
 > This is optional, ActiveN doesn't require this. You can still implement your own property pages using Win32 if you want.
 
 Here is a screenshot of the PropertyGrid-based property page in action (from the `ActiveN.Samples.HelloWorld` sample) in an Excel Spreadsheet in design mode:
- ![Property Page](/Assets/custom_property_page.png?raw=true)
+ ![Property Page](/assets/custom_property_page.png?raw=true)
 
  ## Some screenshots:
 
