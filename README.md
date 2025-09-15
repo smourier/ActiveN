@@ -6,11 +6,12 @@ It lets you author controls and automation objects that run inside legacy or cur
 
 ## Why ActiveN?
 
-.NET Core doesn't provide any facility for building OLE/ActiveX controls. ActiveN focuses on:
+.NET Core doesn't provide any facility for building OLE/ActiveX controls and lacks some important COM features. ActiveN focuses on:
 - Relatively small, self-contained, AOT-publishable binaries
 - Explicit control over COM identity (GUIDs, interfaces, type libraries)
 - Support for aggregation (critical for host compatibility like Excel)
 - Control custom implementation (in-place activation, UI, events, persistence)
+- x86, x64, and ARM64 support
 - Hosting DirectX (Direct3D11, Direct2D, DirectComposition, etc.) content in legacy hosts
 
 If you need to modernize or replace aging C++ / ATL / VB6 controls with .NET code while keeping host compatibility, this framework can help.
@@ -36,6 +37,7 @@ Most hosts that load OLE/ActiveX controls (or late-bound automation objects) sho
 - COM hosting and registration support (full support for `regsvr32`)
 - COM class, interface, and events authoring (IDispatch, dual & custom interfaces, TypeLib support)
 - COM aggregation support (required for some hosts such as Excel VBA)
+- HKCU and HKLM registration support
 - ActiveX / OLE control support (IOleObject, IOleControl, IOleInPlaceActiveObject, IPersistStreamInit, etc.)
 - IConnectionPointContainer / IConnectionPoint event sink infrastructure
 - OLE control persistence support (state save/restore)
@@ -76,6 +78,7 @@ This custom step is included in the sample project files and invokes Windows SDK
 <Import Project="..\ActiveN\ComObjects.targets" />
 ...
 ``` 
+> ActiveN doesn't use the `EnableComHosting` MSBuild property since it doesn't provide (as of today) the necessary AOT compatibility.
 
 ### Debug
 Debug builds are standard .NET builds (no AOT publishing, but AOT compatibility is checked) for easier debugging and faster iteration.
@@ -117,9 +120,29 @@ And here is an example of a Release build output, which includes the one and onl
 Since we're building true COM components, registration is done via `regsvr32` (no need for RegAsm or similar tools).
 In Debug mode, you register the *myCustom.comthunk.dll* file, while in Release/Publish mode, you register the single *myCustom.dll* file.
 
+Contrary to .NET Core built-in registration (see this https://github.com/dotnet/runtime/issues/45750), ActiveN supports HKCU and HKLM registration
 
-## Testing
+By default, DLL registration depends on the privileges of the current user:
 
+* If running elevated (as Administrator): registration is performed under HKLM (machine-wide).
+
+* If running without elevation: registration is performed under HKCU (per-user).
+
+You can explicitly override this default behavior when calling regsvr32:
+
+    regsvr32 myCustom.dll
+=> Uses the default behavior (HKLM if elevated, otherwise HKCU).
+
+    regsvr32 /n /i:user myCustom.dll
+=> Forces registration under HKCU (per-user).
+
+    regsvr32 /n /i:admin myCustom.dll
+=> Forces registration under HKLM (machine-wide). Requires administrative privileges.
+
+
+> Tip: Since Windows Vista or so, regsvr32 automatically detects the bitness of the target DLL. If needed, it will restart itself with the correct architecture (32-bit or 64-bit), so you don’t have to worry about manually choosing the right executable.
+
+---
 ## Quick Start (Authoring a Custom COM Component / ActiveX Control)
 
 1. Copy one of the sample projects as a template. The .csproj from the sample projects includes all necessary build steps and references.
@@ -130,10 +153,26 @@ In Debug mode, you register the *myCustom.comthunk.dll* file, while in Release/P
 7. Register (via provided registration helper or `regsvr32` path).
 8. Load in your target host and test.
 
-> Recommendation: Maintain a short checklist script for re-generating TLB and re-registering after interface changes.
+> Recommendation: Make sure you always keep the .IDL and interfaces .cs in sync.
 
----
+## Design Mode Property Pages (PropertyGrid Helper)
 
-## Minimal Conceptual Flow
+In traditional ActiveX controls, property pages are implemented as separate COM objects that the host can instantiate and display when the user wants to edit control properties.
+The problem is they are based on Win32 dialog boxes, which are not easy to implement in .NET, especially in an AOT-compatible way.
 
+To simplify this, ActiveN provides an optional helper library, `ActiveN.PropertyGrid`, that implements a generic property page based on the standard **.NET Framework 4** `PropertyGrid` control.
+
+Yes, you read correctly: the .NET Framework 4 Winforms' `PropertyGrid` control is used in a .NET Core AOT-compatible component. The reasons are:
+- The `PropertyGrid` control is a standard Winforms control that is part of .NET Framework.
+- The .NET framework is itself part of the OS now (no need to deploy .NET Framework 4 with your component).
+- .NET Core's Winforms and WPF are not AOT-compatible (yet?), so we can't use them directly.
+
+So in the end, the .NET Framework is very AOT-compatible and what happens is ActiveN hosts the .NET Framework CLR to display the property page, while your control and its logic (property get/set) remain in .NET Core.
+
+> This is optional, ActiveN doesn't require this. You can still implement your own property pages using Win32 if you want.
+
+Here is a screenshot of the PropertyGrid-based property page in action (from the `ActiveN.Samples.HelloWorld` sample) in an Excel Spreadsheet in design mode:
+ ![Property Page](/Assets/custom_property_page.png?raw=true)
+
+ ## Some screenshots:
 
