@@ -17,7 +17,7 @@ public class WebView2Window : Window
     public event EventHandler<ValueEventArgs<ICoreWebView2NewWindowRequestedEventArgs>>? NewWindowRequested;
     public event EventHandler<ValueEventArgs<string?>>? DocumentTitleChanged;
 
-    public WebView2Window(HWND parentHandle, WINDOW_STYLE style, RECT rect)
+    public WebView2Window(HWND parentHandle, WINDOW_STYLE style, RECT rect, string? source)
         : base(title: nameof(WebView2Window), parentHandle: parentHandle, style: style, rect: rect)
     {
         // this checks WebView2Loader.dll is present somewhere (file path or embedded resource)
@@ -68,9 +68,16 @@ public class WebView2Window : Window
 
                     controller.put_Bounds(ClientRect).ThrowOnError();
 
-                    // use 1st arg from command line or default to Bing
-                    var url = CommandLine.Current.GetNullifiedArgument(0, "https://www.bing.com/");
-                    webView2.Navigate(PWSTR.From(url));
+                    if (string.IsNullOrWhiteSpace(source))
+                    {
+                        var text = $"WebView2 V{BrowserVersion} - {RuntimeInformation.ProcessArchitecture} - .NET V{Environment.Version}";
+                        var html = $"<body style='margin:0;padding:0'><p style='height:100vh;background-image:linear-gradient(90deg,#e3ffe7 0%,#d9e7ff 100%);font-family:consolas;display:flex;justify-content: center;align-items:center'>{text}</p>";
+                        webView2.NavigateToString(PWSTR.From(html));
+                    }
+                    else
+                    {
+                        webView2.Navigate(PWSTR.From(source));
+                    }
                 }));
             }));
         if (hr.IsError)
@@ -90,6 +97,11 @@ public class WebView2Window : Window
             _webView2.Object.get_Source(out var p).ThrowOnError();
             using var pwstr = new Pwstr(p.Value);
             return pwstr.ToString() ?? string.Empty;
+        }
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            Navigate(value);
         }
     }
 
@@ -130,12 +142,14 @@ public class WebView2Window : Window
     public void Navigate(string uri)
     {
         ArgumentNullException.ThrowIfNull(uri);
+        TracingUtilities.Trace($"Navigating to {uri}...");
         _webView2?.Object.Navigate(PWSTR.From(uri)).ThrowOnError();
     }
 
     public void NavigateToString(string htmlContent)
     {
         ArgumentNullException.ThrowIfNull(htmlContent);
+        TracingUtilities.Trace($"Navigating to HTML content: `{htmlContent}`");
         _webView2?.Object.NavigateToString(PWSTR.From(htmlContent)).ThrowOnError();
     }
 
@@ -175,13 +189,5 @@ public class WebView2Window : Window
         base.Dispose(disposing);
     }
 
-    protected override bool OnPaint(HDC hdc, PAINTSTRUCT ps) { Paint(hdc, ClientRect); return true; }
-
     public static string BrowserVersion { get; private set; } = "<not initialized>";
-    internal static void Paint(HDC hdc, RECT rc)
-    {
-        TracingUtilities.Trace($"Paint hdc: {hdc}");
-        var text = $"WebView2 version '{BrowserVersion}' from ActiveN .NET {Environment.Version} ({DateTime.Now})";
-        _ = DirectN.Functions.TextOutW(hdc, (rc.left + rc.right) / 2, (rc.top + rc.bottom) / 2, PWSTR.From(text), text.Length);
-    }
 }

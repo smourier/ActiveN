@@ -23,8 +23,10 @@ library ActiveNSamplesWebView2Lib
 	]
 	interface IWebView2Control : IDispatch
 	{
+		[propput]
+		HRESULT Source([in] BSTR value);
 		[propget]
-		HRESULT Source([out, retval]BSTR* value);
+			HRESULT Source([out, retval]BSTR* value);
 
 		[propget]
 			HRESULT StatusBarText([out, retval]BSTR* value);
@@ -42,6 +44,28 @@ library ActiveNSamplesWebView2Lib
 
 		[id(DISPID_REFRESH)]
 			HRESULT Reload();
+	};
+
+	[
+		uuid(2c3aaa0e-573f-45c2-932d-c9fd3cbacf1a),
+		helpstring("Event interface for IWebView2Control")
+	]
+		dispinterface IWebView2ControlEvents
+	{
+		properties:
+		methods:
+			// ids here *must* match those in WebView2ControlEventsDispIds.cs
+			[id(100)]
+			void NavigationCompleted();
+
+			[id(101)]
+			void FrameNavigationCompleted();
+
+			[id(102)]
+			void NewWindowRequested();
+
+			[id(103)]
+			void DocumentTitleChanged();
 	};
 
 	[

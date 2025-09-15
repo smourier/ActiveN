@@ -10,6 +10,10 @@ public partial interface IWebView2Control : IDispatch
 #pragma warning disable IDE1006 // Naming Styles
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT set_Source(BSTR value);
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
     HRESULT get_Source(out BSTR value);
 
     [PreserveSig]

@@ -59,9 +59,9 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
         Interlocked.Exchange(ref _drawIcon, null)?.Dispose();
     }
 
-    protected override void SetStockProperty(object? value, [CallerMemberName] string? name = null)
+    protected override bool SetStockProperty(object? value, [CallerMemberName] string? name = null)
     {
-        base.SetStockProperty(value, name);
+        var ret = base.SetStockProperty(value, name);
         if (Window != null)
         {
             switch (name)
@@ -75,6 +75,7 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
                     break;
             }
         }
+        return ret;
     }
 
     protected override void Draw(HDC hdc, RECT bounds)
@@ -82,7 +83,7 @@ public partial class PdfViewControl : BaseControl, IPdfViewControl
         if (hdc == 0)
             return;
 
-        if ((Window != null && Window.PageCount > 0) && InUserMode)
+        if (Window != null && Window.PageCount > 0 && InUserMode)
             return; // nothing to do, window will paint itself
 
         // we can get here if we've not been activated yet 

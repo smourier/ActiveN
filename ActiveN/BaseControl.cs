@@ -139,14 +139,14 @@ public abstract partial class BaseControl : BaseDispatch,
     protected override void OnStockPropertyChanged(int dispId)
     {
         TracingUtilities.Trace($"dispId: {(DISPID)dispId} FreezeCount: {FreezeCount}");
+        IsDirty = true;
         base.OnStockPropertyChanged(dispId);
+
         if (FreezeCount == 0 && !FireOnRequestEdit(dispId))
         {
             TracingUtilities.Trace($"OnRequestEdit failed for dispId: {dispId}");
             return;
         }
-
-        IsDirty = true;
 
         if (FreezeCount == 0)
         {
@@ -283,6 +283,7 @@ public abstract partial class BaseControl : BaseDispatch,
     protected virtual void Load(Stream stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
+        LoadStockProperties(stream);
         LoadAll(stream);
         IsDirty = false;
         ChangeState(ControlState.Loaded);
@@ -291,6 +292,7 @@ public abstract partial class BaseControl : BaseDispatch,
     protected virtual void Save(Stream stream, bool clearDirty)
     {
         ArgumentNullException.ThrowIfNull(stream);
+        SaveStockProperties(stream);
         SaveAll(stream);
         if (clearDirty)
         {
@@ -1437,20 +1439,11 @@ public abstract partial class BaseControl : BaseDispatch,
         var clip = lprcClipRect;
         return TracingUtilities.WrapErrors(() =>
         {
-            var window = _window;
-            TracingUtilities.Trace($"lprcPosRect: {pos} lprcClipRect: {clip} window: {window}");
-            if (window != null)
-            {
-                //var tempRgn = new HRGN();
-                //if (Functions.IntersectRect(out var rc, pos, clip) && !Functions.EqualRect(rc, pos))
-                //{
-                //    Functions.OffsetRect(ref rc, -pos.left, -pos.top);
-                //    tempRgn = Functions.CreateRectRgnIndirect(rc);
-                //}
-
-                //_ = Functions.SetWindowRgn(window.Handle, tempRgn, true);
-                SetWindowPos(pos);
-            }
+            TracingUtilities.Trace($"lprcPosRect: {pos} lprcClipRect: {clip}");
+            var dpi = GetDpi();
+            var extent = new SIZE(pos.Width.PixelToHiMetric(dpi), pos.Height.PixelToHiMetric(dpi));
+            ((IOleObject)this).SetExtent(DVASPECT.DVASPECT_CONTENT, extent);
+            SetWindowPos(pos);
             return Constants.S_OK;
         });
     }
@@ -1545,17 +1538,7 @@ public abstract partial class BaseControl : BaseDispatch,
         return hr;
     }
 
-    HRESULT IQuickActivate.SetContentExtent(in SIZE pSizel)
-    {
-        var size = pSizel;
-        return TracingUtilities.WrapErrors(() =>
-        {
-            HiMetricExtent = size;
-            TracingUtilities.Trace($"pSizel: {size} pixels: {HiMetricExtent.HiMetricToPixel(GetDpi())}");
-            return ((IOleObject)this).SetExtent(DVASPECT.DVASPECT_CONTENT, size);
-        });
-    }
-
+    HRESULT IQuickActivate.SetContentExtent(in SIZE pSizel) => ((IOleObject)this).SetExtent(DVASPECT.DVASPECT_CONTENT, pSizel);
     HRESULT IQuickActivate.GetContentExtent(out SIZE pSizel)
     {
         var size = new SIZE();

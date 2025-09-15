@@ -16,6 +16,10 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
 {
     private static readonly ConcurrentDictionary<Type, DispatchType> _cache = new();
 
+#pragma warning disable IDE1006 // Naming Styles
+    private const uint STOCK_PROPERTIES_MAGIC = 0x316D7053; // 'Spm1'
+#pragma warning restore IDE1006 // Naming Styles
+
     private ComObject<ITypeInfo>? _typeInfo;
     private ComObject<ITypeInfo>? _dispatchInterfaceInfo;
     private bool _typeInfosLoaded;
@@ -34,22 +38,33 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
     protected virtual IDictionary<int, IReadOnlyList<PredefinedString>> PredefinedStrings { get; set; } = new Dictionary<int, IReadOnlyList<PredefinedString>>();
     protected virtual int AutoDispidsBase => 0x10000;
 
-    protected virtual void SetStockProperty(object? value, [CallerMemberName] string? name = null)
+    protected virtual bool RemoveStockProperty([CallerMemberName] string? name = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var ret = StockProperties.Remove(name);
+        if (ret)
+        {
+            OnStockPropertyChanged(name);
+        }
+        return ret;
+    }
+
+    protected virtual bool SetStockProperty(object? value, [CallerMemberName] string? name = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (StockProperties.TryGetValue(name, out var current))
         {
             if (Equals(current, value))
-                return;
+                return false;
 
             StockProperties[name] = value;
             OnStockPropertyChanged(name);
+            return true;
         }
-        else
-        {
-            StockProperties[name] = value;
-            OnStockPropertyChanged(name);
-        }
+
+        StockProperties[name] = value;
+        OnStockPropertyChanged(name);
+        return true;
     }
 
     protected virtual T? GetStockProperty<T>(T? defaultValue = default, [CallerMemberName] string? name = null)
@@ -89,6 +104,44 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
 
     protected virtual void OnStockPropertyChanged(int dispId)
     {
+        // do nothing by default
+    }
+
+    protected virtual void SaveStockProperties(Stream stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        if (StockProperties.Count == 0)
+            return;
+
+        var writer = new BinaryWriter(stream);
+        writer.Write(STOCK_PROPERTIES_MAGIC);
+        StockProperties.Serialize(stream);
+    }
+
+    protected unsafe virtual void LoadStockProperties(Stream stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        const int sizeofInt32 = 4;
+        Span<byte> buffer = stackalloc byte[sizeofInt32];
+        if (stream.Read(buffer) != sizeofInt32)
+            return;
+
+        var magic = *(uint*)Unsafe.AsPointer(ref buffer[0]);
+        if (magic != STOCK_PROPERTIES_MAGIC)
+            return;
+
+        var stockProperties = new Dictionary<string, object?>(NamedPropertyStore.Deserialize(stream), StringComparer.OrdinalIgnoreCase);
+        var existing = StockProperties.Select(p => p.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var kvp in stockProperties)
+        {
+            existing.Remove(kvp.Key);
+            SetStockProperty(kvp.Value, kvp.Key);
+        }
+
+        foreach (var key in existing)
+        {
+            RemoveStockProperty(key);
+        }
     }
 
     CustomQueryInterfaceResult ICustomQueryInterface.GetInterface(ref Guid iid, out nint ppv) => GetInterface(ref iid, out ppv);

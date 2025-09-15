@@ -1,6 +1,8 @@
 ﻿// Copyright (c) Aelyo Softworks S.A.S.. All rights reserved.
 // See LICENSE in the project root for license information.
 
+using System.Threading;
+
 namespace ActiveN.Samples.WebView2;
 
 // TODO: generate another GUID, change ProgId and DisplayName
@@ -14,15 +16,31 @@ public partial class WebView2Control : BaseControl, IWebView2Control
 {
     public const string Category = "WebView2";
 
+    private readonly DispatchConnectionPoint _eventsConnectionPoint; // disposed by BaseControl
+    private Icon? _drawIcon;
+
     public WebView2Control()
     {
+        var IID_IWebView2ControlEvents = new Guid("2c3aaa0e-573f-45c2-932d-c9fd3cbacf1a"); // this must match the one in the .idl
+        _eventsConnectionPoint = new DispatchConnectionPoint(IID_IWebView2ControlEvents);
+        AddConnectionPoint(_eventsConnectionPoint);
         PropertyPagesIds = [typeof(WebView2ControlPage).GUID];
     }
 
     #region Mandatory overrides
     protected override ComRegistration ComRegistration => ComHosting.Instance;
     protected override Guid DispatchInterfaceId => typeof(IWebView2Control).GUID;
-    protected override Window CreateWindow(HWND parentHandle, RECT rect) => new WebView2Window(parentHandle, GetDefaultWindowStyle(parentHandle), rect);
+    protected override Window CreateWindow(HWND parentHandle, RECT rect)
+    {
+        var window = new WebView2Window(parentHandle, GetDefaultWindowStyle(parentHandle), rect, Source);
+
+        // bind .NET events to forward to COM clients
+        window.NavigationCompleted += (s, e) => _eventsConnectionPoint.InvokeMember((int)WebView2ControlEventsDispIds.NavigationCompleted);
+        window.FrameNavigationCompleted += (s, e) => _eventsConnectionPoint.InvokeMember((int)WebView2ControlEventsDispIds.FrameNavigationCompleted);
+        window.NewWindowRequested += (s, e) => _eventsConnectionPoint.InvokeMember((int)WebView2ControlEventsDispIds.NewWindowRequested);
+        window.DocumentTitleChanged += (s, e) => _eventsConnectionPoint.InvokeMember((int)WebView2ControlEventsDispIds.DocumentTitleChanged);
+        return window;
+    }
     #endregion
 
     public new WebView2Window? Window => (WebView2Window?)base.Window; // disposed by BaseControl
@@ -32,7 +50,36 @@ public partial class WebView2Control : BaseControl, IWebView2Control
         if (hdc == 0)
             return;
 
-        WebView2Window.Paint(hdc, bounds);
+        DirectN.Functions.FillRect(hdc, bounds, (HBRUSH)DirectN.Functions.GetStockObject(GET_STOCK_OBJECT_FLAGS.WHITE_BRUSH).Value);
+        if (InDesignMode)
+        {
+            // we can get here if we've not been activated yet 
+            // draw our icon centered & maxed in the bounds
+            var text = $"WebView2 V{BrowserVersion} - {RuntimeInformation.ProcessArchitecture} - .NET V{Environment.Version}";
+            _ = DirectN.Functions.SetTextAlign(hdc, TEXT_ALIGN_OPTIONS.TA_CENTER | TEXT_ALIGN_OPTIONS.TA_BASELINE);
+            DirectN.Functions.TextOutW(hdc, bounds.Width / 2, bounds.Height / 2, PWSTR.From(text), text.Length);
+        }
+    }
+
+    protected override bool SetStockProperty(object? value, [CallerMemberName] string? name = null)
+    {
+        var ret = base.SetStockProperty(value, name);
+        if (Window != null)
+        {
+            switch (name)
+            {
+                case nameof(Source):
+                    Window.Source = Source;
+                    break;
+            }
+        }
+        return ret;
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        Interlocked.Exchange(ref _drawIcon, null)?.Dispose();
     }
 
     #region IDispatch implementation, static (IDL/TLB) and dynamic (reflection)
@@ -46,7 +93,7 @@ public partial class WebView2Control : BaseControl, IWebView2Control
     public string BrowserVersion => WebView2Window.BrowserVersion;
 
     [Category(Category)]
-    public string Source => Window?.Source ?? string.Empty;
+    public string Source { get => GetStockProperty<string>() ?? string.Empty; set => SetStockProperty(value); }
 
     [Category(Category)]
     public string StatusBarText => Window?.StatusBarText ?? string.Empty;
@@ -54,20 +101,26 @@ public partial class WebView2Control : BaseControl, IWebView2Control
     [Category(Category)]
     public string DocumentTitle => Window?.DocumentTitle ?? string.Empty;
 
-    HRESULT IWebView2Control.get_BrowserVersion(out BSTR value) { value = new BSTR(Marshal.StringToBSTR(BrowserVersion)); return DirectN.Constants.S_OK; }
+    public void GoBack() => Window?.GoBack();
+    public void GoForward() => Window?.GoForward();
+    public void Reload() => Window?.Reload();
+    public void Navigate(string uri) => Window?.Navigate(uri);
+    public void NavigateToString(string htmlContent) => Window?.NavigateToString(htmlContent);
+
+    HRESULT IWebView2Control.set_Source(BSTR value) { Source = value.ToString() ?? string.Empty; return DirectN.Constants.S_OK; }
     HRESULT IWebView2Control.get_Source(out BSTR value) { value = new BSTR(Marshal.StringToBSTR(Source)); return DirectN.Constants.S_OK; }
+    HRESULT IWebView2Control.get_BrowserVersion(out BSTR value) { value = new BSTR(Marshal.StringToBSTR(BrowserVersion)); return DirectN.Constants.S_OK; }
     HRESULT IWebView2Control.get_StatusBarText(out BSTR value) { value = new BSTR(Marshal.StringToBSTR(StatusBarText)); return DirectN.Constants.S_OK; }
     HRESULT IWebView2Control.get_DocumentTitle(out BSTR value) { value = new BSTR(Marshal.StringToBSTR(DocumentTitle)); return DirectN.Constants.S_OK; }
-
-    HRESULT IWebView2Control.GoBack() { Window?.GoBack(); return DirectN.Constants.S_OK; }
-    HRESULT IWebView2Control.GoForward() { Window?.GoForward(); return DirectN.Constants.S_OK; }
-    HRESULT IWebView2Control.Reload() { Window?.Reload(); return DirectN.Constants.S_OK; }
+    HRESULT IWebView2Control.GoBack() { GoBack(); return DirectN.Constants.S_OK; }
+    HRESULT IWebView2Control.GoForward() { GoForward(); return DirectN.Constants.S_OK; }
+    HRESULT IWebView2Control.Reload() { Reload(); return DirectN.Constants.S_OK; }
     HRESULT IWebView2Control.Navigate(BSTR uri)
     {
         if (uri.Value == 0)
             return DirectN.Constants.E_POINTER;
 
-        Window?.Navigate(Marshal.PtrToStringBSTR(uri.Value) ?? string.Empty);
+        Navigate(Marshal.PtrToStringBSTR(uri.Value) ?? string.Empty);
         return DirectN.Constants.S_OK;
     }
 
@@ -76,7 +129,7 @@ public partial class WebView2Control : BaseControl, IWebView2Control
         if (htmlContent.Value == 0)
             return DirectN.Constants.E_POINTER;
 
-        Window?.NavigateToString(Marshal.PtrToStringBSTR(htmlContent.Value) ?? string.Empty);
+        NavigateToString(Marshal.PtrToStringBSTR(htmlContent.Value) ?? string.Empty);
         return DirectN.Constants.S_OK;
     }
 

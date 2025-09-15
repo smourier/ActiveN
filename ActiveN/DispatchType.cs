@@ -144,6 +144,7 @@ public class DispatchType([DynamicallyAccessedMembers(DynamicallyAccessedMemberT
 
             var category = GetCategory(method);
             var member = CreateMember(dispid, category, method) ?? throw new InvalidOperationException();
+            TracingUtilities.Trace($"add method: {method.Name} dispid: {dispid} category: {category} readonly: {member.IsReadOnly}");
 
             var page = method?.GetCustomAttribute<PropertyPageAttribute>();
             if (page != null)

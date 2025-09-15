@@ -37,6 +37,7 @@
 		<None Remove="runtimes\win-arm64\native\WebView2Loader.dll" />
 		<None Remove="runtimes\win-x64\native\WebView2Loader.dll" />
 		<None Remove="runtimes\win-x86\native\WebView2Loader.dll" />
+		<None Remove="WebView2.ico" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -111,6 +112,10 @@
 
 	<ItemGroup>
 	  <Folder Include="External\" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Icon Include="WebView2.ico" />
 	</ItemGroup>
 
 </Project>
