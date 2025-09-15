@@ -177,7 +177,7 @@ Here is a screenshot of the PropertyGrid-based property page in action (from the
 
  ## Some screenshots:
 
- VB6 Hosting WebView2 (design mode)
+ Microsoft VB6 Hosting WebView2 (design mode)
  
  <img width="1361" height="784" alt="VB6 ActiveX Control .NET Core Design" src="https://github.com/user-attachments/assets/08b4eee8-b895-4fb8-b963-a7fcdbec7105" />
 
@@ -185,7 +185,11 @@ Here is a screenshot of the PropertyGrid-based property page in action (from the
 
  <img width="836" height="547" alt="VB6 ActiveX Control .NET Core" src="https://github.com/user-attachments/assets/8461f3c9-bf58-4bf9-9b7f-060629095375" />
 
- Microsoft Word (Office 365 x64) Hosting PDF View (design mode)
+ VB6 Code:
+ 
+<img width="383" height="218" alt="B6 ActiveX Control .NET Core Code" src="https://github.com/user-attachments/assets/ff67df06-4a02-4fe5-ba3e-b86063002797" />
+
+ Microsoft Word (Office 365 x64) hosting PDF View (design mode)
 
  <img width="925" height="553" alt="Word ActiveX Control .NET Core PDF Design" src="https://github.com/user-attachments/assets/522fb215-59ac-4a5f-8caf-1681c27c4a03" />
 
@@ -193,5 +197,10 @@ Here is a screenshot of the PropertyGrid-based property page in action (from the
 
 <img width="989" height="772" alt="Word ActiveX Control .NET Core PDF" src="https://github.com/user-attachments/assets/d07b6da8-1307-4800-a779-4148b3ff1612" />
 
+ Microsoft Excel (Office 365 x64) hosting WebView2 (user mode)
 
+<img width="1197" height="767" alt="Excel ActiveX Control .NET Core WebView2" src="https://github.com/user-attachments/assets/c30bad01-f5e2-445c-94e9-9f955930cf21" />
 
+Microsoft Visual FoxPro 9 hosting WebView2 (design mode):
+
+<img width="1140" height="718" alt="Visual Foxpro 9 ActiveX Control .NET Core PDF" src="https://github.com/user-attachments/assets/8ae064ff-0892-41a8-ad6f-685b4400ab99" />
