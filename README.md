@@ -6,12 +6,12 @@ It lets you author controls and automation objects that run inside legacy or cur
 
 ## Why ActiveN?
 
-Traditional .NET COM interop (RegAsm, COM-visible assemblies, RCWs) is not compatible with Native AOT and often pulls large runtime dependencies. ActiveN focuses on:
+.NET Core doesn't provide any facility for building OLE/ActiveX controls. ActiveN focuses on:
 - Relatively small, self-contained, AOT-publishable binaries
 - Explicit control over COM identity (GUIDs, interfaces, type libraries)
 - Support for aggregation (critical for host compatibility like Excel)
 - Control custom implementation (in-place activation, UI, events, persistence)
-- Hosting DirectX (Direct2D, DirectComposition, etc.) content in legacy hosts
+- Hosting DirectX (Direct3D11, Direct2D, DirectComposition, etc.) content in legacy hosts
 
 If you need to modernize or replace aging C++ / ATL / VB6 controls with .NET code while keeping host compatibility, this framework can help.
 
@@ -24,8 +24,8 @@ Most hosts that load OLE/ActiveX controls (or late-bound automation objects) sho
 - VBScript (cscript.exe)
 - VB6 (yes, the "legacy" 32-bit one)
 - Visual FoxPro 9 (yes the also "legacy" 32-bit one)
-- TstCon – official [ActiveX Control Test Container](https://github.com/Microsoft/VCSamples/tree/master/VC2010Samples/MFC/ole/TstCon)
-- TstCon64 – 64-bit fork: [TstCon64](https://github.com/smourier/TstCon64)
+- TstCon â€“ official [ActiveX Control Test Container](https://github.com/Microsoft/VCSamples/tree/master/VC2010Samples/MFC/ole/TstCon)
+- TstCon64 â€“ 64-bit fork: [TstCon64](https://github.com/smourier/TstCon64)
 
 > Tip: Always test both 32-bit and 64-bit where applicable.
 
@@ -46,22 +46,22 @@ Most hosts that load OLE/ActiveX controls (or late-bound automation objects) sho
 
 ## Repository Structure
 
-- **ActiveN** – Core library providing the COM/ActiveX infrastructure. Depends only on .NET and [DirectNAot](https://github.com/smourier/DirectNAot) for AOT-friendly Windows interop.
-- **ActiveN.PropertyGrid** – Optional runtime helper enabling a PropertyGrid-backed "custom" OLE property page (see remarks below).
+- **ActiveN** â€“ Core library providing the COM/ActiveX infrastructure. Depends only on .NET and [DirectNAot](https://github.com/smourier/DirectNAot) for AOT-friendly Windows interop.
+- **ActiveN.PropertyGrid** â€“ Optional runtime helper enabling a PropertyGrid-backed "custom" OLE property page (see remarks below).
 
 ### ActiveX Sample Controls
 
-- **ActiveN.Samples.SimpleComObject** – Simple automation object (no UI)
-- **ActiveN.Samples.HelloWorld** – Minimal ActiveX control
-- **ActiveN.Samples.Pdfview** – PDF viewer hosting sample
-- **ActiveN.Samples.WebView2** – WebView2 browser hosting sample (uses [WebView2Aot](https://github.com/smourier/WebView2Aot))
+- **ActiveN.Samples.SimpleComObject** â€“ Simple automation object (no UI)
+- **ActiveN.Samples.HelloWorld** â€“ Minimal ActiveX control
+- **ActiveN.Samples.Pdfview** â€“ PDF viewer hosting sample
+- **ActiveN.Samples.WebView2** â€“ WebView2 browser hosting sample (uses [WebView2Aot](https://github.com/smourier/WebView2Aot))
 
 ### Tests
 
-- **SimpleComObject.VBscript** – VBScript exercising IDispatch
-- **PdfView.VBscript** – Extracts images from a PDF via the PdfView control
-- **WebView2.Excel** – Excel VBA integration demo
-- **WebView2.VB6** – VB6 host project
+- **SimpleComObject.VBscript** â€“ VBScript exercising IDispatch
+- **PdfView.VBscript** â€“ Extracts images from a PDF via the PdfView control
+- **WebView2.Excel** â€“ Excel VBA integration demo
+- **WebView2.VB6** â€“ VB6 host project
 
 ---
 ## Building and Publishing
@@ -97,7 +97,7 @@ More info on this development/debugging technique is available in [AotNetComHost
 
 Here is an example of a Debug build output:
 
-![image][Debug Build](assets/debug_build.png)
+ ![Debug Build](/assets/debug_build.png?raw=true)
 
 ### Release
 __Release__ builds are not supposed to be used directly: they are only intermediate steps before Native AOT publishing.
@@ -107,11 +107,11 @@ For example, you can use the provided *FolderProfile.x64.pubxml* to publish a se
 
 Here is an example of a publish profile for a self-contained 32-bit binary:
 
-![image][Publish Profile](assets/publish_x86.png)]
+ ![Publish Profile](/assets/publish_x86.png?raw=true)]
 
 And here is an example of a Release build output, which includes the one and only dll and extra .PDB files to ease debugging (that you don't need to distribute):
 
-![image][Release Build](assets/release_build.png)
+ ![Release Build](/assets/release_build.png?raw=true)
 
 ## Registration
 Since we're building true COM components, registration is done via `regsvr32` (no need for RegAsm or similar tools).
