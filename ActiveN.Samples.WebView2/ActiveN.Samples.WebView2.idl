@@ -32,6 +32,9 @@ library ActiveNSamplesWebView2Lib
 		[propget, id(DISPID_CAPTION)]
 			HRESULT DocumentTitle([out, retval]BSTR* value);
 
+		[propget]
+			HRESULT BrowserVersion([out, retval]BSTR* value);
+
 		HRESULT Navigate(BSTR uri);
 		HRESULT NavigateToString(BSTR htmlContent);
 		HRESULT GoBack();

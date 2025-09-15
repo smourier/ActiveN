@@ -83,6 +83,10 @@ public class PropertiesForm : Form
 
             var parentHwnd = (nint)parentHandle;
             form.ParentHandle = parentHwnd;
+
+            // tell IVSMDPerPropertyBrowsing.GetPropertyAttributes we're .NET Framework 4.x to avoid crashing
+            // check BaseDispatch.cs for more details
+            Environment.SetEnvironmentVariable("ActiveN.NetFX", Environment.Version.ToString());
             form.Grid.SelectedObject = value;
             SetParent(form.Handle, parentHwnd);
 

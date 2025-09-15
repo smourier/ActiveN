@@ -12,6 +12,8 @@ namespace ActiveN.Samples.WebView2;
 [GeneratedComClass]
 public partial class WebView2Control : BaseControl, IWebView2Control
 {
+    public const string Category = "WebView2";
+
     public WebView2Control()
     {
         PropertyPagesIds = [typeof(WebView2ControlPage).GUID];
@@ -40,11 +42,19 @@ public partial class WebView2Control : BaseControl, IWebView2Control
     [DispId(unchecked((int)DISPID.STDPROPID_XOBJ_NAME))]
     public string Name { get => GetStockProperty<string>() ?? nameof(WebView2Control); set => SetStockProperty(value); }
 
+    [Category(Category)]
     public string BrowserVersion => WebView2Window.BrowserVersion;
+
+    [Category(Category)]
     public string Source => Window?.Source ?? string.Empty;
+
+    [Category(Category)]
     public string StatusBarText => Window?.StatusBarText ?? string.Empty;
+
+    [Category(Category)]
     public string DocumentTitle => Window?.DocumentTitle ?? string.Empty;
 
+    HRESULT IWebView2Control.get_BrowserVersion(out BSTR value) { value = new BSTR(Marshal.StringToBSTR(BrowserVersion)); return DirectN.Constants.S_OK; }
     HRESULT IWebView2Control.get_Source(out BSTR value) { value = new BSTR(Marshal.StringToBSTR(Source)); return DirectN.Constants.S_OK; }
     HRESULT IWebView2Control.get_StatusBarText(out BSTR value) { value = new BSTR(Marshal.StringToBSTR(StatusBarText)); return DirectN.Constants.S_OK; }
     HRESULT IWebView2Control.get_DocumentTitle(out BSTR value) { value = new BSTR(Marshal.StringToBSTR(DocumentTitle)); return DirectN.Constants.S_OK; }

@@ -19,6 +19,10 @@ public partial interface IWebView2Control : IDispatch
     [PreserveSig]
     [return: MarshalAs(UnmanagedType.Error)]
     HRESULT get_DocumentTitle(out BSTR value);
+
+    [PreserveSig]
+    [return: MarshalAs(UnmanagedType.Error)]
+    HRESULT get_BrowserVersion(out BSTR value);
 #pragma warning restore IDE1006 // Naming Styles
 
     [PreserveSig]
