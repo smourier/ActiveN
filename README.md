@@ -22,6 +22,8 @@ Most hosts that load OLE/ActiveX controls (or late-bound automation objects) sho
 
 - Excel VBA
 - Word VBA
+- .NET Framework
+- .NET Core (this host is very special, it only works with published AOT versions)
 - VBScript (cscript.exe)
 - VB6 (yes, the "legacy" 32-bit one)
 - Visual FoxPro 9 (yes the also "legacy" 32-bit one)
