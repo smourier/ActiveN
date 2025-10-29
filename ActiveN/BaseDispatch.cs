@@ -515,8 +515,8 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
                 var excepInfo = new EXCEPINFO
                 {
                     scode = unchecked((int)Constants.E_FAIL),
-                    bstrDescription = new Bstr(ex.GetInterestingExceptionMessage()),
-                    bstrSource = new Bstr(GetType().FullName),
+                    bstrDescription = new(Marshal.StringToBSTR(ex.GetAllMessages())),
+                    bstrSource = new(Marshal.StringToBSTR(GetType().FullName)),
                 };
 
                 *(EXCEPINFO*)pExcepInfo = excepInfo;
@@ -860,7 +860,7 @@ public abstract partial class BaseDispatch : IDisposable, ICustomQueryInterface,
 
     HRESULT IVsPerPropertyBrowsing.GetClassName(out BSTR pbstrClassName)
     {
-        pbstrClassName = new Bstr(GetType().FullName);
+        pbstrClassName = new(Marshal.StringToBSTR(GetType().FullName));
         TracingUtilities.Trace($"class name: '{pbstrClassName}'");
         return Constants.S_OK;
     }
