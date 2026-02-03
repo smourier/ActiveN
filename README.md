@@ -46,8 +46,8 @@ Most hosts that load OLE/ActiveX controls (or late-bound automation objects) sho
 - Type library (TLB) generation from `.IDL` files (you own the IDL surface and its .NET counterpart)
 - Native AOT publish path for minimal footprint and simplified deployment
 - Facilitated .NET Core AOT development & debugging with [AotNetComHost](https://github.com/smourier/AotNetComHost)
-- No dependency on WinForms or WPF (you will have to to windowing / rendering yourself by using 3rd parties or DirectX / Direct2D / DirectComposition code).
-This is actually mitigated by the fact *some* WPF and Winforms .NET 10+ projects do support some level of AOT-publishing using `_SuppressWinFormsTrimError` and `_SuppressWpfTrimError` MsBuild properties (see for example this Winforms 10 AOT project https://github.com/smourier/WebView2Aot/tree/main/MarkdownViewer).
+- No dependency on WinForms or WPF. It means you will have to to windowing / rendering yourself by using 3rd parties or DirectX / Direct2D / DirectComposition code, or event host .NET Framework 4.8 Winforms as demonstrated in the code for property grid support.
+Well, this is actually mitigated by the fact *some* WPF and Winforms .NET 10+ projects do support some level of AOT-publishing using `_SuppressWinFormsTrimError` and `_SuppressWpfTrimError` MsBuild properties (see for example this Winforms 10 AOT project https://github.com/smourier/WebView2Aot/tree/main/MarkdownViewer).
 
 ## Repository Structure
 
