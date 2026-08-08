@@ -50,15 +50,6 @@
 		<ProjectReference Include="..\ActiveN\ActiveN.csproj" />
 	</ItemGroup>
 
-	<ItemGroup>
-		<Reference Include="DirectN">
-			<HintPath>..\ActiveN\External\DirectN.dll</HintPath>
-		</Reference>
-		<Reference Include="DirectN.Extensions">
-			<HintPath>..\ActiveN\External\DirectN.Extensions.dll</HintPath>
-		</Reference>
-	</ItemGroup>
-
 	<Target Name="AotNetComHost" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">
 		<ItemGroup>
 			<AotNetComHost Include="$(ProjectDir)..\ActiveN\External\AotNetComHost.$(Platform).dll" />

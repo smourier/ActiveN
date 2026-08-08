@@ -43,16 +43,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.2.0" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<Reference Include="DirectN">
-			<HintPath>..\ActiveN\External\DirectN.dll</HintPath>
-		</Reference>
-		<Reference Include="DirectN.Extensions">
-			<HintPath>..\ActiveN\External\DirectN.Extensions.dll</HintPath>
-		</Reference>
+		<PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.3.1" />
 	</ItemGroup>
 
 	<Target Name="AotNetComHost" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">

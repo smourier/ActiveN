@@ -16,6 +16,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <PackageReference Include="DirectNAot" Version="1.6.5" />
+	  <PackageReference Include="DirectNAot.Extensions" Version="1.6.5" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<Using Include="ActiveN" />
 		<Using Include="ActiveN.Hosting" />
 		<Using Include="ActiveN.Utilities" />
@@ -41,33 +46,6 @@
 		<Using Include="System.Text" />
 		<Using Include="System.Threading" />
 		<Using Include="System.Threading.Tasks" />
-	</ItemGroup>
-
-	<ItemGroup Condition="'$(Platform)'=='x86'">
-		<Reference Include="DirectN">
-			<HintPath>External\x86\DirectN.dll</HintPath>
-		</Reference>
-		<Reference Include="DirectN.Extensions">
-			<HintPath>External\x86\DirectN.Extensions.dll</HintPath>
-		</Reference>
-	</ItemGroup>
-
-	<ItemGroup Condition="'$(Platform)'=='x64'">
-		<Reference Include="DirectN">
-			<HintPath>External\x64\DirectN.dll</HintPath>
-		</Reference>
-		<Reference Include="DirectN.Extensions">
-			<HintPath>External\x64\DirectN.Extensions.dll</HintPath>
-		</Reference>
-	</ItemGroup>
-
-	<ItemGroup Condition="'$(Platform)'=='ARM64'">
-		<Reference Include="DirectN">
-			<HintPath>External\ARM64\DirectN.dll</HintPath>
-		</Reference>
-		<Reference Include="DirectN.Extensions">
-			<HintPath>External\ARM64\DirectN.Extensions.dll</HintPath>
-		</Reference>
 	</ItemGroup>
 
 </Project>

@@ -44,18 +44,6 @@
 		<ProjectReference Include="..\ActiveN\ActiveN.csproj" />
 	</ItemGroup>
 
-	<ItemGroup>
-		<Reference Include="DirectN">
-			<HintPath>..\ActiveN\External\DirectN.dll</HintPath>
-		</Reference>
-		<Reference Include="DirectN.Extensions">
-			<HintPath>..\ActiveN\External\DirectN.Extensions.dll</HintPath>
-		</Reference>
-		<Reference Include="WebView2">
-			<HintPath>External\WebView2.dll</HintPath>
-		</Reference>
-	</ItemGroup>
-
 	<Target Name="AotNetComHost" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">
 		<ItemGroup>
 			<AotNetComHost Include="$(ProjectDir)..\ActiveN\External\AotNetComHost.$(Platform).dll" />
@@ -111,11 +99,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Folder Include="External\" />
+	  <Icon Include="WebView2.ico" />
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Icon Include="WebView2.ico" />
+	  <PackageReference Include="WebView2Aot" Version="1.5.0" />
 	</ItemGroup>
 
 </Project>
