@@ -29,7 +29,8 @@ public class WebView2Window : Window
         // use webview2 user data folder under local app data to ensure it'll work wherever the app is installed
         var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), GetType().Namespace!);
 
-        var hr = global::WebView2.Functions.CreateCoreWebView2EnvironmentWithOptions(PWSTR.Null, PWSTR.From(path), null!,
+        using var pathStr = new Pwstr(path);
+        var hr = global::WebView2.Functions.CreateCoreWebView2EnvironmentWithOptions(PWSTR.Null, pathStr, null!,
             new CoreWebView2CreateCoreWebView2EnvironmentCompletedHandler((result, env) =>
             {
                 if (result.IsError)
