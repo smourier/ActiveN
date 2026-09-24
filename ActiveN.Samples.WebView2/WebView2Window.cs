@@ -144,6 +144,7 @@ public class WebView2Window : Window
             _webView2Events = null;
             _webView2?.Dispose();
             _webView2 = null;
+            _controller?.Object.Close();
             _controller?.Dispose();
             _controller = null;
         }
