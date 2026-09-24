@@ -103,7 +103,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <PackageReference Include="WebView2Aot" Version="1.5.4" />
+	  <PackageReference Include="WebView2Aot" Version="1.6.0" />
 	</ItemGroup>
 
 </Project>
